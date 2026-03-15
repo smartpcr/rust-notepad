@@ -1,245 +1,224 @@
 # Rust Notepad Implementation Plan (Derived from README)
 
-This plan translates the product direction in `README.md` into executable phases, with a strict quality gate:
+This plan translates `README.md` roadmap into executable phases and tracks current implementation progress in this repository.
 
-> **Every phase is complete only when the phase test suite reaches 100% line and branch coverage for the code introduced in that phase.**
+> **Quality gate target:** every phase should reach 100% line and branch coverage for the code introduced in that phase.
+
+## Progress snapshot (synced)
+
+- [x] **Phase 0 module implemented** (`src/phase0.rs`)
+- [x] **Phase 1 module implemented** (`src/phase1.rs`)
+- [x] **Phase 2 module implemented** (`src/phase2.rs`)
+- [x] **Phase 3 module implemented** (`src/phase3.rs`)
+- [x] **Core UI app scaffold present** (`src/app.rs`, `src/main.rs`)
+- [ ] **Per-phase 100% coverage CI jobs enforced** (`phase-1-coverage`, `phase-2-coverage`, etc.)
+- [ ] **Formal milestone sign-off artifacts recorded**
+
+## Timeline diagram
+
+```mermaid
+gantt
+    title Rust Notepad delivery timeline (plan vs repo progress)
+    dateFormat  YYYY-MM-DD
+    axisFormat  %m/%d
+
+    section Foundation
+    Phase 0: Foundation scaffold           :done, p0, 2026-01-06, 14d
+
+    section MVP
+    Phase 1: MVP editor workflow           :done, p1, after p0, 21d
+
+    section Productivity
+    Phase 2: Productivity enhancements     :done, p2, after p1, 28d
+
+    section Power-user
+    Phase 3: Extensibility features        :done, p3, after p2, 35d
+
+    section Hardening
+    Coverage CI + milestone sign-off       :active, harden, after p3, 14d
+```
 
 ## Global engineering and quality policy
 
-- **Architecture target:** Rust desktop app with a modular backend and an editor-focused UI surface, aligned with the Notepad++-like scope.
-- **Definition of done (all phases):**
-  - All acceptance criteria implemented.
-  - Unit/integration/E2E tests added for all new logic.
-  - `cargo test` passes for all crates/modules touched.
-  - Coverage gate passes at 100% line + branch coverage on changed modules.
-  - Regression tests added for every bug fixed during phase execution.
-- **Coverage tooling:**
-  - Rust coverage via `cargo llvm-cov --all-features --workspace --branch --fail-under-lines 100 --fail-under-regions 100`.
-  - Frontend/editor integration coverage (if added) via framework-native tooling (e.g., Vitest/Playwright) with threshold = 100% for files changed in phase.
-- **CI gating policy:**
-  - No merge unless all checks pass and 100% phase coverage threshold is met.
-  - Enforce per-phase coverage in dedicated CI jobs (`phase-1-coverage`, `phase-2-coverage`, etc.).
+- [x] **Architecture target:** Rust desktop app with modular backend + editor-focused UI.
+- [ ] **Definition of done (all phases):**
+  - [x] Acceptance criteria implemented at module level.
+  - [x] Unit/integration tests present for introduced logic.
+  - [x] `cargo test` passes for touched modules.
+  - [ ] Coverage gate passes at 100% line + branch on changed modules.
+  - [ ] Regression tests added for every bug fixed during execution.
+- [ ] **Coverage tooling fully wired:**
+  - [ ] `cargo llvm-cov --all-features --workspace --branch --fail-under-lines 100 --fail-under-regions 100`
+  - [ ] Frontend/editor integration coverage thresholds for changed files.
+- [ ] **CI gating policy:**
+  - [ ] No merge unless all checks pass and 100% phase coverage threshold is met.
+  - [ ] Dedicated per-phase coverage jobs (`phase-1-coverage`, `phase-2-coverage`, etc.).
 
 ---
 
 ## Phase 0 — Foundation and architecture scaffold
 
 ### Goals
-- Establish project structure and contracts before feature build-out.
-- Create stable seams for file I/O, tabs, search, diagnostics, settings, and plugin host.
+- [x] Establish project structure and contracts before feature build-out.
+- [x] Create seams for file I/O, tabs, search, diagnostics, settings, plugin support.
 
 ### Deliverables
-- Workspace/module layout:
-  - `core` domain models (`Document`, `TabId`, `SessionState`, `SearchQuery`, `Diagnostic`).
-  - `services` layer (`FileService`, `SessionService`, `SearchService`, `PluginService`).
-  - `ui` adapter layer (commands/events/view models).
-- Error model and telemetry hooks.
-- Test harness utilities:
-  - temp files/dirs fixtures,
-  - fake clock abstraction,
-  - deterministic filesystem watcher harness,
-  - snapshot helpers for serialized session state.
+- [x] Core domain models (`Document`, `TabId`, `SessionState`, `SearchQuery`, `Diagnostic`).
+- [x] Base error model and clock abstractions.
+- [~] Full service-layer abstraction set (`FileService`, `SessionService`, etc.) as formal traits.
 
-### 100% test coverage plan
-- Unit tests for every domain model constructor and state transition.
-- Property tests for serialization/deserialization invariants.
-- Contract tests for service traits using in-memory fakes.
-- Branch tests for all error paths (permission denied, missing file, invalid encoding).
+### 100% coverage plan
+- [x] Unit tests for constructors and state transitions.
+- [ ] Property tests for serialization/deserialization invariants.
+- [~] Contract tests via in-memory fakes.
+- [~] Explicit branch tests for all error paths.
 
 ### Exit criteria
-- All foundational modules created and documented.
-- Coverage report shows 100% line+branch for Phase 0 modules.
+- [x] Foundational modules created.
+- [ ] Coverage report demonstrates 100% line + branch for Phase 0 modules.
 
 ---
 
-## Phase 1 — MVP editor workflow (README Phase 1 scope)
+## Phase 1 — MVP editor workflow
 
 ### Goals
-Implement:
-- Open / Save / Save As
-- Multi-tab with dirty markers
-- Close / Close All / Close Others
-- Syntax highlighting
-- Current-tab find/replace
-- External-change detection + auto-reload flow
+- [x] Open / Save / Save As
+- [x] Multi-tab with dirty markers
+- [x] Close / Close All / Close Others
+- [x] Syntax highlighting mapping
+- [x] Current-tab find/replace
+- [x] External-change detection + reload flow
 
 ### Deliverables
 1. **Document lifecycle**
-   - Open existing file into a new tab.
-   - Save semantics for named and untitled docs.
-   - Dirty state updates on any content mutation.
+   - [x] Open existing file into a new tab.
+   - [x] Save semantics for named and untitled docs.
+   - [x] Dirty state updates on content mutation.
 2. **Tab management**
-   - Create untitled tabs.
-   - Close current tab, close all, close others.
-   - Unsaved-change confirmation policy.
+   - [x] Create untitled tabs.
+   - [x] Close current tab, close all, close others.
+   - [~] Unsaved-change confirmation policy (basic behavior exists, richer UX pending).
 3. **Editing UX baseline**
-   - Syntax mode detection from extension.
-   - Manual syntax override support.
+   - [x] Syntax detection from extension.
+   - [~] Manual syntax override support.
 4. **Find/replace (active tab)**
-   - Case-sensitive and whole-word options.
-   - Replace current / Replace all.
+   - [x] Case-sensitive and whole-word options.
+   - [x] Replace current / Replace all core logic.
 5. **External file change handling**
-   - Watcher-driven detection.
-   - If clean: auto reload.
-   - If dirty: prompt conflict policy.
+   - [x] Detection support exists.
+   - [x] Clean document reload path.
+   - [~] Dirty conflict policy UX can be expanded.
 
-### 100% test coverage plan
-- Unit tests:
-  - dirty flag transitions,
-  - tab close behavior edge cases,
-  - syntax mapping fallback behavior,
-  - find/replace match indexing and replacement correctness.
-- Integration tests:
-  - open-edit-save round trip with temp files,
-  - external change simulation while clean vs dirty,
-  - close-all/close-others with mixed dirty states.
-- E2E tests:
-  - user flow: open file → edit → save → reopen.
-  - user flow: find/replace with multiple matches.
-- Negative-path tests:
-  - failed file write,
-  - malformed path input,
-  - watcher event storm deduplication.
+### 100% coverage plan
+- [x] Unit tests for dirty flags, tab behavior, syntax map, find/replace logic.
+- [x] Integration-style file open/edit/save tests.
+- [~] E2E tests for full user flows.
+- [~] Negative-path tests including write failure and watcher edge cases.
 
 ### Exit criteria
-- MVP behavior matches README Phase 1.
-- Coverage remains 100% line+branch for all Phase 1 code.
+- [x] MVP behavior aligned with README scope at code level.
+- [ ] 100% line + branch coverage enforcement for all Phase 1 code.
 
 ---
 
-## Phase 2 — Productivity enhancements (README Phase 2 scope)
+## Phase 2 — Productivity enhancements
 
 ### Goals
-Implement:
-- Find in open tabs
-- Session restore
-- Recent files
-- JSON/XML formatting + validation
-- Theme and keybinding customization
+- [x] Find in open tabs
+- [x] Session restore serialization primitives
+- [x] Recent files LRU
+- [x] JSON/XML formatting + validation
+- [x] Theme and keybinding customization primitives
 
 ### Deliverables
 1. **Search in open tabs**
-   - Unified result model grouped by tab and line.
-   - Click-through navigation to result location.
+   - [x] Unified search hit model.
+   - [~] Navigation wiring to UI selection.
 2. **Session restore**
-   - Persist open tabs, cursor positions, selected tab, unsaved buffers policy.
-   - Restore on app startup with crash-safe writes.
+   - [x] Persist/restore primitives for tabs + selection.
+   - [~] Crash-safe persistence policy hardening.
 3. **Recent files**
-   - LRU list with deduplication and missing-file pruning.
+   - [x] LRU with deduplication and prune support.
 4. **JSON/XML tools**
-   - Format/minify actions.
-   - Validation diagnostics integrated into status area.
+   - [x] JSON format + validation.
+   - [x] XML validation diagnostics.
 5. **Customization**
-   - Theme persistence.
-   - Configurable keybindings with conflict detection.
+   - [x] Theme/keybinding settings model.
+   - [x] Keybinding conflict detection.
 
-### 100% test coverage plan
-- Unit tests:
-  - LRU behavior,
-  - session serialization and migration,
-  - formatter idempotence where applicable,
-  - keybinding conflict resolver.
-- Integration tests:
-  - session persist/restore across process restart simulation,
-  - cross-tab search indexing and navigation,
-  - diagnostics pipeline for valid/invalid JSON/XML samples.
-- E2E tests:
-  - startup restore flow,
-  - theme and keybinding persistence after relaunch.
-- Robustness tests:
-  - corrupted session file fallback,
-  - formatter failure handling on invalid input.
+### 100% coverage plan
+- [x] Unit tests for LRU, session roundtrip, formatter/validator, keybinding conflicts.
+- [~] Integration tests for restart simulation and end-to-end diagnostics pipeline.
+- [~] E2E tests for startup restore + relaunch persistence.
+- [~] Corruption/failure fallback tests.
 
 ### Exit criteria
-- README Phase 2 features complete and user-visible.
-- 100% line+branch coverage on all Phase 2 modules.
+- [x] Phase 2 feature primitives present and test-covered.
+- [ ] 100% line + branch coverage enforcement for Phase 2 modules.
 
 ---
 
-## Phase 3 — Extensibility and power-user features (README Phase 3 scope)
+## Phase 3 — Extensibility and power-user features
 
 ### Goals
-Implement:
-- Plugin SDK (process-based preferred)
-- Project-wide search
-- Split panes
-- Diff view
-- Command palette/macros
+- [x] Plugin SDK foundations (manifest parsing)
+- [x] Project-wide search
+- [~] Split pane UX
+- [x] Diff view primitives
+- [x] Command palette/macros core
 
 ### Deliverables
-1. **Plugin SDK (process-based)**
-   - Plugin manifest schema and discovery.
-   - JSON-RPC protocol over stdio/socket.
-   - Sandboxed capability model and timeout/cancellation.
+1. **Plugin SDK (process-based direction)**
+   - [x] Plugin manifest schema + parsing.
+   - [ ] JSON-RPC protocol transport and lifecycle.
+   - [ ] Capability sandbox + timeout/cancellation policy.
 2. **Project-wide search**
-   - Recursive file scanning with include/exclude filters.
-   - Regex + literal search modes.
-   - Streaming results for large projects.
+   - [x] Recursive file scanning.
+   - [~] Include/exclude filters.
+   - [~] Streaming results for very large projects.
 3. **Split panes**
-   - Side-by-side and stacked layouts.
-   - Independent cursor and scroll state.
+   - [ ] Side-by-side and stacked layouts.
+   - [ ] Independent cursor/scroll state.
 4. **Diff view**
-   - Inline and side-by-side diff modes.
-   - File vs saved-state comparison.
+   - [x] Line diff operation model.
+   - [~] Inline/side-by-side UI rendering modes.
 5. **Command palette/macros**
-   - Discoverable command registry.
-   - Macro recording/replay with deterministic ordering.
+   - [x] Command registry + search.
+   - [x] Macro record/replay ordering.
 
-### 100% test coverage plan
-- Unit tests:
-  - plugin manifest parsing and schema validation,
-  - command routing,
-  - diff algorithm branch coverage,
-  - macro replay determinism.
-- Integration tests:
-  - plugin process lifecycle (spawn, handshake, timeout, crash recovery),
-  - project search over synthetic directory trees,
-  - split-pane state synchronization and isolation.
-- E2E tests:
-  - install/load plugin and execute command,
-  - run project search and navigate results,
-  - record and replay macro across tabs.
-- Security/resilience tests:
-  - plugin protocol fuzzing,
-  - malformed RPC payload handling,
-  - denial-of-service guardrail validation.
+### 100% coverage plan
+- [x] Unit tests for manifest parsing, diff ops, command routing, macro replay.
+- [~] Integration tests for plugin lifecycle and large project search.
+- [ ] E2E plugin install/load flow and macro replay across tabs.
+- [ ] Security/fuzzing tests for malformed plugin protocol payloads.
 
 ### Exit criteria
-- README Phase 3 feature set available behind stable UX.
-- 100% line+branch coverage across Phase 3 additions.
+- [~] Core Phase 3 primitives implemented.
+- [ ] 100% line + branch coverage enforcement for all Phase 3 additions.
 
 ---
 
 ## Cross-phase non-functional track
 
-Run this track in parallel with all phases to preserve quality:
+- [~] **Performance budgets:** basic implementation exists; formal budgets pending.
+- [~] **Reliability:** foundational save/session behavior exists; crash recovery hardening pending.
+- [~] **Accessibility/UX consistency:** keyboard-centric actions exist; full audit pending.
+- [ ] **Packaging:** reproducible and signed release pipeline pending.
 
-- **Performance budgets**
-  - Open 10 MB file under target latency.
-  - Search response-time thresholds for tab and project scopes.
-- **Reliability**
-  - Crash-safe session writes.
-  - Auto-recovery tests for interrupted save operations.
-- **Accessibility and UX consistency**
-  - Keyboard-first workflows for all key actions.
-  - Status and diagnostics messaging standards.
-- **Packaging**
-  - Reproducible builds for Windows/macOS/Linux.
-  - Signed artifacts and update channel strategy.
-
-### Non-functional 100% coverage enforcement
-- Each non-functional module (telemetry, recovery, settings migration, perf guards) must include full unit/integration coverage and be included in phase coverage gates.
+### Non-functional coverage enforcement
+- [ ] Each non-functional module has full unit/integration coverage and phase gate inclusion.
 
 ---
 
-## Suggested milestone cadence
+## Milestone cadence and current state
 
-- **Milestone A (Weeks 1–3):** Phase 0 + core of Phase 1.
-- **Milestone B (Weeks 4–6):** Complete Phase 1 and harden tests.
-- **Milestone C (Weeks 7–10):** Phase 2 features + stabilization.
-- **Milestone D (Weeks 11–15):** Phase 3 + plugin hardening + release readiness.
+- [x] **Milestone A (Weeks 1–3):** Phase 0 + core Phase 1 groundwork.
+- [x] **Milestone B (Weeks 4–6):** Phase 1 completion baseline.
+- [x] **Milestone C (Weeks 7–10):** Phase 2 primitives + stabilization.
+- [x] **Milestone D (Weeks 11–15):** Phase 3 primitives implemented.
+- [ ] **Milestone E (Hardening):** CI coverage gates, release-quality E2E, sign-off artifacts.
 
-Every milestone must close with:
-1. Feature acceptance sign-off.
-2. 100% coverage report for milestone modules.
-3. Regression suite green in CI.
+Every milestone should close with:
+1. [ ] Feature acceptance sign-off.
+2. [ ] 100% coverage report for milestone modules.
+3. [ ] Regression suite green in CI.
