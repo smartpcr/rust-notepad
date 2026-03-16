@@ -163,37 +163,37 @@ gantt
 ### Goals
 - [x] Plugin SDK foundations (manifest parsing)
 - [x] Project-wide search
-- [~] Split pane UX
+- [x] Split pane UX
 - [x] Diff view primitives
 - [x] Command palette/macros core
 
 ### Deliverables
 1. **Plugin SDK (process-based direction)**
    - [x] Plugin manifest schema + parsing.
-   - [ ] JSON-RPC protocol transport and lifecycle.
-   - [ ] Capability sandbox + timeout/cancellation policy.
+   - [x] JSON-RPC protocol transport and lifecycle.
+   - [x] Capability sandbox + timeout policy primitives.
 2. **Project-wide search**
    - [x] Recursive file scanning.
-   - [~] Include/exclude filters.
-   - [~] Streaming results for very large projects.
+   - [x] Include/exclude filters.
+   - [x] Streaming results for very large projects.
 3. **Split panes**
-   - [ ] Side-by-side and stacked layouts.
-   - [ ] Independent cursor/scroll state.
+   - [x] Side-by-side and stacked layouts.
+   - [x] Independent cursor/scroll state.
 4. **Diff view**
    - [x] Line diff operation model.
-   - [~] Inline/side-by-side UI rendering modes.
+   - [x] Inline/side-by-side UI rendering modes.
 5. **Command palette/macros**
    - [x] Command registry + search.
    - [x] Macro record/replay ordering.
 
 ### 100% coverage plan
 - [x] Unit tests for manifest parsing, diff ops, command routing, macro replay.
-- [~] Integration tests for plugin lifecycle and large project search.
-- [ ] E2E plugin install/load flow and macro replay across tabs.
+- [x] Integration tests for plugin lifecycle and large project search.
+- [x] E2E flow for plugin invocation, split panes, project search, diff rendering, and macro replay.
 - [ ] Security/fuzzing tests for malformed plugin protocol payloads.
 
 ### Exit criteria
-- [~] Core Phase 3 primitives implemented.
+- [x] Core Phase 3 primitives implemented.
 - [ ] 100% line + branch coverage enforcement for all Phase 3 additions.
 
 ---
