@@ -102,10 +102,21 @@ fn key_name(key: egui::Key) -> &'static str {
     }
 }
 
-/// Render a menu item with shortcut hint text.
+/// Render a menu item with label left-aligned and shortcut right-aligned.
 pub fn menu_item(ui: &mut egui::Ui, label: &str, shortcut: &egui::KeyboardShortcut) -> bool {
-    let text = format!("{}        {}", label, shortcut_text(shortcut));
-    ui.button(text).clicked()
+    let shortcut_str = shortcut_text(shortcut);
+    let min_width = 220.0;
+
+    let response = ui.horizontal(|ui| {
+        ui.set_min_width(min_width);
+        let r = ui.button(label);
+        // Push shortcut text to the right
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.weak(&shortcut_str);
+        });
+        r
+    });
+    response.inner.clicked()
 }
 
 #[cfg(test)]

@@ -8,12 +8,17 @@ pub struct FindState {
     pub matches: Vec<usize>,
     pub selected_match: usize,
     pub show_panel: bool,
+    /// When set, the editor should move cursor to this byte range and select it.
+    pub navigate_to: Option<(usize, usize)>,
+    /// When true, the editor TextEdit should request focus (makes cursor visible and blinking).
+    pub focus_editor: bool,
 }
 
 impl FindState {
     pub fn find_next(&mut self) {
         if !self.matches.is_empty() {
             self.selected_match = (self.selected_match + 1) % self.matches.len();
+            self.request_navigation();
         }
     }
 
@@ -24,6 +29,22 @@ impl FindState {
             } else {
                 self.selected_match -= 1;
             }
+            self.request_navigation();
+        }
+    }
+
+    pub fn select_match(&mut self, idx: usize) {
+        if idx < self.matches.len() {
+            self.selected_match = idx;
+            self.request_navigation();
+        }
+    }
+
+    fn request_navigation(&mut self) {
+        if let Some(&pos) = self.matches.get(self.selected_match) {
+            let end = pos + self.query.len();
+            self.navigate_to = Some((pos, end));
+            self.focus_editor = true;
         }
     }
 }
@@ -35,6 +56,99 @@ pub struct GoToLineState {
     pub input: String,
 }
 
+/// Cursor position for display in status bar.
+#[derive(Clone, Copy, Default)]
+pub struct CursorPosition {
+    pub line: usize,
+    pub col: usize,
+    pub byte_offset: usize,
+    pub selection_len: usize,
+}
+
+/// Persisted application state saved to disk between sessions.
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct PersistedState {
+    pub theme: String,
+    pub font_size: f32,
+    pub ui_zoom_pct: u32,
+    pub show_toolbar: bool,
+    pub show_status_bar: bool,
+    pub show_line_numbers: bool,
+    pub word_wrap: bool,
+    pub show_whitespace: bool,
+    /// If true, tabs wrap to multiple lines; if false, tabs scroll horizontally.
+    #[serde(default = "default_true")]
+    pub tab_wrap: bool,
+    /// Paths of open tabs, in order. Empty string for untitled tabs.
+    pub open_tabs: Vec<String>,
+    /// Index of the active tab.
+    pub active_tab: usize,
+}
+
+impl Default for PersistedState {
+    fn default() -> Self {
+        Self {
+            theme: "Dark".to_string(),
+            font_size: 14.0,
+            ui_zoom_pct: 100,
+            show_toolbar: true,
+            show_status_bar: true,
+            show_line_numbers: true,
+            word_wrap: false,
+            show_whitespace: false,
+            tab_wrap: true,
+            open_tabs: Vec::new(),
+            active_tab: 0,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl PersistedState {
+    /// Path to the session file.
+    pub fn session_path() -> std::path::PathBuf {
+        let mut p = dirs_next().unwrap_or_else(|| std::path::PathBuf::from("."));
+        p.push("session.json");
+        p
+    }
+
+    /// Load from disk, falling back to defaults.
+    pub fn load() -> Self {
+        let path = Self::session_path();
+        match std::fs::read_to_string(&path) {
+            Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+            Err(_) => Self::default(),
+        }
+    }
+
+    /// Save to disk.
+    pub fn save(&self) {
+        let path = Self::session_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(&path, json);
+        }
+    }
+}
+
+/// Returns the CodeEdit config directory (~/.codeedit/).
+fn dirs_next() -> Option<std::path::PathBuf> {
+    // Use HOME or USERPROFILE on Windows
+    std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()
+        .map(|home| {
+            let mut p = std::path::PathBuf::from(home);
+            p.push(".codeedit");
+            p
+        })
+}
+
 /// View-related settings (togglable panels, display options).
 #[derive(Clone)]
 pub struct ViewSettings {
@@ -44,6 +158,11 @@ pub struct ViewSettings {
     pub word_wrap: bool,
     pub show_whitespace: bool,
     pub font_size: f32,
+    pub cursor: CursorPosition,
+    /// Global UI zoom percentage (100 = normal, 150 = 150% etc.)
+    pub ui_zoom_pct: u32,
+    /// If true, tabs wrap to multiple lines; if false, tabs scroll horizontally.
+    pub tab_wrap: bool,
 }
 
 impl Default for ViewSettings {
@@ -55,6 +174,9 @@ impl Default for ViewSettings {
             word_wrap: false,
             show_whitespace: false,
             font_size: 14.0,
+            cursor: CursorPosition::default(),
+            ui_zoom_pct: 100,
+            tab_wrap: true,
         }
     }
 }
@@ -66,6 +188,23 @@ impl ViewSettings {
 
     pub fn zoom_out(&mut self) {
         self.font_size = (self.font_size - 1.0).max(6.0);
+    }
+
+    pub fn ui_zoom_in(&mut self) {
+        self.ui_zoom_pct = (self.ui_zoom_pct + 10).min(300);
+    }
+
+    pub fn ui_zoom_out(&mut self) {
+        self.ui_zoom_pct = self.ui_zoom_pct.saturating_sub(10).max(50);
+    }
+
+    pub fn ui_zoom_reset(&mut self) {
+        self.ui_zoom_pct = 100;
+    }
+
+    /// Pixels per point for the given zoom level.
+    pub fn pixels_per_point(&self) -> f32 {
+        self.ui_zoom_pct as f32 / 100.0
     }
 }
 

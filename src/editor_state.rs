@@ -148,7 +148,8 @@ pub fn load_document(
     path: PathBuf,
     syntax_map: &HashMap<&'static str, &'static str>,
 ) -> AppResult<Document> {
-    let content = fs::read_to_string(&path).map_err(|err| map_io_err(err.kind(), &path))?;
+    let raw = fs::read(&path).map_err(|err| map_io_err(err.kind(), &path))?;
+    let content = decode_bytes(&raw);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("txt");
     Ok(Document {
         id: TabId(0),
@@ -164,7 +165,35 @@ pub fn load_document(
         last_modified: fs::metadata(path).ok().and_then(|m| m.modified().ok()),
         externally_changed: false,
         diagnostics: String::new(),
+        fold_state: crate::folding::FoldState::default(),
     })
+}
+
+/// Decode raw bytes into a String, handling UTF-8, UTF-16 LE/BE (with BOM),
+/// and falling back to Windows-1252 for other encodings.
+fn decode_bytes(raw: &[u8]) -> String {
+    // Check for BOM
+    if raw.len() >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF {
+        // UTF-8 BOM — strip it and decode as UTF-8
+        return String::from_utf8_lossy(&raw[3..]).into_owned();
+    }
+    if raw.len() >= 2 && raw[0] == 0xFF && raw[1] == 0xFE {
+        // UTF-16 LE BOM
+        let (decoded, _, _) = encoding_rs::UTF_16LE.decode(&raw[2..]);
+        return decoded.into_owned();
+    }
+    if raw.len() >= 2 && raw[0] == 0xFE && raw[1] == 0xFF {
+        // UTF-16 BE BOM
+        let (decoded, _, _) = encoding_rs::UTF_16BE.decode(&raw[2..]);
+        return decoded.into_owned();
+    }
+    // Try UTF-8 first
+    if let Ok(s) = std::str::from_utf8(raw) {
+        return s.to_owned();
+    }
+    // Fallback: decode as Windows-1252 (common on Windows for non-UTF-8 files)
+    let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(raw);
+    decoded.into_owned()
 }
 
 pub fn write_document(doc: &mut Document, path: PathBuf) -> AppResult<()> {
@@ -323,7 +352,7 @@ mod tests {
 
         let syntax_map = crate::core::default_syntax_map();
         let mut doc = load_document(path.clone(), &syntax_map).expect("load document");
-        assert_eq!(doc.syntax, "rust");
+        assert_eq!(doc.syntax, "rs");
 
         doc.set_content("fn main() { println!(\"hi\"); }\n");
         write_document(&mut doc, path.clone()).expect("save document");
@@ -375,6 +404,7 @@ mod tests {
             last_modified: Some(UNIX_EPOCH + Duration::from_secs(5)),
             externally_changed: false,
             diagnostics: String::new(),
+            fold_state: Default::default(),
         };
         assert!(detect_external_change(
             &doc,

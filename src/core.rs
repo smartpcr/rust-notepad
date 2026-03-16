@@ -2,6 +2,8 @@ use std::{collections::HashMap, fs, path::PathBuf, time::SystemTime};
 
 use serde::{Deserialize, Serialize};
 
+use crate::folding::FoldState;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TabId(pub u64);
 
@@ -41,6 +43,9 @@ pub struct Document {
     /// Transient: diagnostic messages from plugins/validation.
     #[serde(skip, default)]
     pub diagnostics: String,
+    /// Transient: code folding state.
+    #[serde(skip, default)]
+    pub fold_state: FoldState,
 }
 
 impl Document {
@@ -55,6 +60,7 @@ impl Document {
             last_modified: None,
             externally_changed: false,
             diagnostics: String::new(),
+            fold_state: FoldState::default(),
         }
     }
 
@@ -179,44 +185,131 @@ impl Clock for FakeClock {
     }
 }
 
+/// Returns a map from file extension to the syntax name used for highlighting.
+///
+/// Values are looked up by `egui_extras::syntax_highlighting` via syntect in two steps:
+/// 1. `find_syntax_by_name(value)` — matches syntect's built-in name (case-insensitive)
+/// 2. `find_syntax_by_extension(value)` — matches file extensions registered in syntect
+///
+/// Syntect's default pack includes ~50 languages. For extensions not covered,
+/// we map to the closest available syntax (e.g. csproj → xml).
+/// If syntect doesn't recognize the value at all, it falls back to plain text.
 pub fn default_syntax_map() -> HashMap<&'static str, &'static str> {
     HashMap::from([
-        ("rs", "rust"),
-        ("js", "javascript"),
-        ("ts", "typescript"),
-        ("py", "python"),
+        // === Languages with full syntect support (use extension for lookup) ===
+        ("rs", "rs"),
+        ("js", "js"),
+        ("py", "py"),
         ("json", "json"),
         ("xml", "xml"),
         ("txt", "txt"),
         ("java", "java"),
         ("cpp", "cpp"),
+        ("cc", "cpp"),
+        ("cxx", "cpp"),
         ("c", "c"),
-        ("h", "c"),
-        ("hpp", "cpp"),
+        ("h", "h"),
+        ("hpp", "hpp"),
+        ("hxx", "hpp"),
         ("go", "go"),
-        ("toml", "toml"),
-        ("md", "markdown"),
+        ("md", "md"),
+        ("markdown", "md"),
         ("html", "html"),
         ("htm", "html"),
         ("css", "css"),
         ("sql", "sql"),
-        ("sh", "bash"),
-        ("bash", "bash"),
-        ("ps1", "powershell"),
+        ("sh", "sh"),
+        ("bash", "sh"),
+        ("zsh", "sh"),
+        ("fish", "sh"),
         ("yaml", "yaml"),
         ("yml", "yaml"),
-        ("rb", "ruby"),
-        ("cs", "csharp"),
-        ("swift", "swift"),
-        ("kt", "kotlin"),
+        ("rb", "rb"),
+        ("cs", "cs"),       // C#
+        ("csx", "cs"),
         ("php", "php"),
-        ("pl", "perl"),
+        ("pl", "pl"),       // Perl
+        ("pm", "pl"),
         ("lua", "lua"),
         ("r", "r"),
+        ("R", "r"),
         ("scala", "scala"),
-        ("hs", "haskell"),
-        ("ex", "elixir"),
-        ("clj", "clojure"),
+        ("sbt", "scala"),
+        ("hs", "hs"),       // Haskell
+        ("clj", "clj"),     // Clojure
+        ("d", "d"),
+        ("pas", "pas"),     // Pascal
+        ("p", "pas"),
+        ("bat", "bat"),
+        ("cmd", "bat"),
+        ("erl", "erl"),     // Erlang
+        ("hrl", "erl"),
+        ("lisp", "lisp"),
+        ("cl", "lisp"),
+        ("el", "lisp"),
+        ("ml", "ml"),       // OCaml
+        ("mli", "ml"),
+        ("m", "m"),         // Objective-C
+        ("mm", "mm"),       // Objective-C++
+        ("groovy", "groovy"),
+        ("gradle", "groovy"),
+        ("diff", "diff"),
+        ("patch", "diff"),
+        ("tex", "tex"),     // LaTeX
+        ("ltx", "tex"),
+        ("re", "re"),       // Regular expression
+        ("dot", "dot"),     // Graphviz
+        ("gv", "dot"),
+        ("tcl", "tcl"),
+        ("haml", "haml"),
+        ("erb", "rails"),
+        ("properties", "properties"),
+        ("mk", "make"),     // Makefile
+        ("make", "make"),
+        // === XML-based formats (use xml syntax) ===
+        ("csproj", "xml"),
+        ("fsproj", "xml"),
+        ("vbproj", "xml"),
+        ("props", "xml"),
+        ("targets", "xml"),
+        ("nuspec", "xml"),
+        ("config", "xml"),
+        ("xaml", "xml"),
+        ("svg", "xml"),
+        ("plist", "xml"),
+        ("xsl", "xml"),
+        ("xslt", "xml"),
+        ("xsd", "xml"),
+        ("wsdl", "xml"),
+        ("rss", "xml"),
+        ("opml", "xml"),
+        // === JSON-based formats ===
+        ("jsonc", "json"),
+        ("geojson", "json"),
+        // === HTML-based formats ===
+        ("vue", "html"),
+        ("svelte", "html"),
+        ("jsp", "jsp"),
+        // === Languages NOT in syntect defaults (fall back to plain text) ===
+        // These are mapped but syntect will silently render as plain text.
+        // When we add custom syntax loading, these will work.
+        ("ts", "js"),       // TypeScript → highlight as JavaScript (close enough)
+        ("tsx", "js"),
+        ("jsx", "js"),
+        ("toml", "yaml"),   // TOML → highlight as YAML (similar key-value style)
+        ("ini", "yaml"),
+        ("cfg", "yaml"),
+        ("conf", "yaml"),
+        ("ps1", "sh"),      // PowerShell → highlight as Shell (better than nothing)
+        ("psm1", "sh"),
+        ("psd1", "sh"),
+        ("swift", "java"),  // Swift → Java (similar C-style syntax)
+        ("kt", "java"),     // Kotlin → Java
+        ("dart", "java"),   // Dart → Java
+        ("lock", "yaml"),   // Cargo.lock → YAML
+        ("csv", "txt"),     // CSV → plain text
+        ("tsv", "txt"),
+        ("log", "txt"),
     ])
 }
 
@@ -269,7 +362,12 @@ mod tests {
     #[test]
     fn syntax_map_contains_expected_defaults() {
         let syntax = default_syntax_map();
-        assert_eq!(syntax.get("rs"), Some(&"rust"));
+        assert_eq!(syntax.get("rs"), Some(&"rs"));
         assert_eq!(syntax.get("txt"), Some(&"txt"));
+        assert_eq!(syntax.get("cs"), Some(&"cs"));
+        assert_eq!(syntax.get("ps1"), Some(&"sh"));   // PowerShell → sh fallback
+        assert_eq!(syntax.get("csproj"), Some(&"xml"));
+        assert_eq!(syntax.get("csv"), Some(&"txt"));   // CSV → plain text
+        assert_eq!(syntax.get("ts"), Some(&"js"));     // TypeScript → JS fallback
     }
 }

@@ -42,11 +42,11 @@ fn render_file_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         ui.separator();
         if menu_item(ui, "Close", &Shortcuts::close_tab()) {
             let idx = app.editor.current_tab;
-            app.editor.close_tab(idx);
+            app.request_close_tab(idx);
             ui.close_menu();
         }
         if ui.button("Close All").clicked() {
-            app.editor.close_all();
+            app.request_close_all();
             ui.close_menu();
         }
     });
@@ -113,17 +113,41 @@ fn render_view_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         ui.checkbox(&mut app.view.show_line_numbers, "Line Numbers");
         ui.checkbox(&mut app.view.word_wrap, "Word Wrap          Alt+Z");
         ui.checkbox(&mut app.view.show_whitespace, "Show Whitespace");
+        ui.checkbox(&mut app.view.tab_wrap, "Wrap Tabs (multi-line)");
         ui.separator();
         ui.horizontal(|ui| {
-            ui.label("Font Size:");
+            ui.label("Editor Font:");
             if ui.button("-").clicked() {
                 app.view.zoom_out();
             }
-            ui.label(format!("{:.0}", app.view.font_size));
+            ui.label(format!("{:.0}pt", app.view.font_size));
             if ui.button("+").clicked() {
                 app.view.zoom_in();
             }
         });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("UI Zoom:");
+            if ui.button("-").clicked() {
+                app.view.ui_zoom_out();
+            }
+            ui.label(format!("{}%", app.view.ui_zoom_pct));
+            if ui.button("+").clicked() {
+                app.view.ui_zoom_in();
+            }
+            if ui.button("Reset").clicked() {
+                app.view.ui_zoom_reset();
+            }
+        });
+        ui.separator();
+        if ui.button("Fold All").clicked() {
+            app.editor.active_doc_mut().fold_state.fold_all();
+            ui.close_menu();
+        }
+        if ui.button("Unfold All").clicked() {
+            app.editor.active_doc_mut().fold_state.unfold_all();
+            ui.close_menu();
+        }
     });
 }
 
@@ -171,7 +195,7 @@ fn render_window_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
 
 fn render_help_menu(ui: &mut egui::Ui) {
     ui.menu_button("Help", |ui| {
-        ui.label("CodeEdit v0.1.0");
+        ui.label("TextEdit v0.1.0");
         ui.label("A Notepad++ clone in Rust");
         ui.separator();
         ui.label("Keyboard shortcuts:");

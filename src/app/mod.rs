@@ -13,7 +13,7 @@ use rust_notepad::{
     core::SearchQuery,
     editor_state::EditorState,
     plugins::{self, EditorPlugin},
-    settings::{FindState, GoToLineState, ViewSettings},
+    settings::{FindState, GoToLineState, PersistedState, ViewSettings},
     shortcuts::Shortcuts,
     theme::AppTheme,
 };
@@ -22,10 +22,20 @@ use rust_notepad::{
 // Main application struct
 // ---------------------------------------------------------------------------
 
+/// Tracks pending close operations that need user confirmation.
+#[derive(Default)]
+pub(crate) struct CloseConfirm {
+    /// Tab indices pending close (dirty ones need confirmation).
+    pub pending_tabs: Vec<usize>,
+    /// True when the dialog is showing.
+    pub open: bool,
+}
+
 pub struct RustNotepadApp {
     pub(crate) editor: EditorState,
     pub(crate) find_state: FindState,
     pub(crate) go_to_line: GoToLineState,
+    pub(crate) close_confirm: CloseConfirm,
     pub(crate) app_theme: AppTheme,
     pub(crate) plugins: Vec<Box<dyn EditorPlugin>>,
     pub(crate) last_scan: SystemTime,
@@ -34,26 +44,193 @@ pub struct RustNotepadApp {
 
 impl RustNotepadApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // Apply dark visuals by default
-        cc.egui_ctx.set_visuals(egui::Visuals::dark());
+        // Load persisted session
+        let persisted = PersistedState::load();
+
+        let theme = if persisted.theme == "Light" {
+            AppTheme::Light
+        } else {
+            AppTheme::Dark
+        };
+        theme.apply(&cc.egui_ctx);
+
+        let view = ViewSettings {
+            show_toolbar: persisted.show_toolbar,
+            show_status_bar: persisted.show_status_bar,
+            show_line_numbers: persisted.show_line_numbers,
+            word_wrap: persisted.word_wrap,
+            show_whitespace: persisted.show_whitespace,
+            font_size: persisted.font_size,
+            ui_zoom_pct: persisted.ui_zoom_pct,
+            tab_wrap: persisted.tab_wrap,
+            ..Default::default()
+        };
+
+        let mut editor = EditorState::default();
+
+        // Restore open tabs from persisted paths
+        let mut restored_any = false;
+        for path_str in &persisted.open_tabs {
+            if path_str.is_empty() {
+                continue;
+            }
+            let path = std::path::PathBuf::from(path_str);
+            if path.exists() {
+                if let Ok(()) = editor.open_document(path) {
+                    restored_any = true;
+                }
+            }
+        }
+        if restored_any {
+            // Remove the default "Untitled 1" tab that EditorState creates
+            if editor.docs.len() > 1 && editor.docs[0].path.is_none() && !editor.docs[0].is_dirty()
+            {
+                editor.docs.remove(0);
+            }
+            // Restore active tab index
+            editor.current_tab = persisted.active_tab.min(editor.docs.len().saturating_sub(1));
+        }
 
         Self {
-            editor: EditorState::default(),
+            editor,
             find_state: FindState::default(),
             go_to_line: GoToLineState::default(),
-            app_theme: AppTheme::Dark,
+            close_confirm: CloseConfirm::default(),
+            app_theme: theme,
             plugins: plugins::default_plugins(),
             last_scan: SystemTime::now(),
-            view: ViewSettings::default(),
+            view,
         }
+    }
+
+    /// Save current session state to disk.
+    fn save_session(&self) {
+        let open_tabs: Vec<String> = self
+            .editor
+            .docs
+            .iter()
+            .map(|doc| {
+                doc.path
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
+
+        let state = PersistedState {
+            theme: self.app_theme.label().to_string(),
+            font_size: self.view.font_size,
+            ui_zoom_pct: self.view.ui_zoom_pct,
+            show_toolbar: self.view.show_toolbar,
+            show_status_bar: self.view.show_status_bar,
+            show_line_numbers: self.view.show_line_numbers,
+            word_wrap: self.view.word_wrap,
+            show_whitespace: self.view.show_whitespace,
+            tab_wrap: self.view.tab_wrap,
+            open_tabs,
+            active_tab: self.editor.current_tab,
+        };
+        state.save();
+    }
+
+    // -- Close with confirmation -------------------------------------------
+
+    /// Request closing a single tab. If dirty, shows confirmation dialog.
+    pub(crate) fn request_close_tab(&mut self, idx: usize) {
+        if idx < self.editor.docs.len() && self.editor.docs[idx].is_dirty() {
+            self.close_confirm.pending_tabs = vec![idx];
+            self.close_confirm.open = true;
+        } else {
+            self.editor.close_tab(idx);
+        }
+    }
+
+    /// Request closing all tabs. If any are dirty, shows confirmation dialog.
+    pub(crate) fn request_close_all(&mut self) {
+        let dirty_indices: Vec<usize> = self
+            .editor
+            .docs
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.is_dirty())
+            .map(|(i, _)| i)
+            .collect();
+        if dirty_indices.is_empty() {
+            self.editor.close_all();
+        } else {
+            self.close_confirm.pending_tabs = dirty_indices;
+            self.close_confirm.open = true;
+        }
+    }
+
+    /// Request closing all tabs except the given index.
+    pub(crate) fn request_close_others(&mut self, keep_idx: usize) {
+        let dirty_indices: Vec<usize> = self
+            .editor
+            .docs
+            .iter()
+            .enumerate()
+            .filter(|(i, d)| *i != keep_idx && d.is_dirty())
+            .map(|(i, _)| i)
+            .collect();
+        if dirty_indices.is_empty() {
+            self.editor.current_tab = keep_idx;
+            self.editor.close_others();
+        } else {
+            // Include all non-kept tabs (dirty ones need confirmation)
+            let all_others: Vec<usize> = (0..self.editor.docs.len())
+                .filter(|&i| i != keep_idx)
+                .collect();
+            self.close_confirm.pending_tabs = all_others;
+            self.close_confirm.open = true;
+        }
+    }
+
+    /// Execute "Save All" for pending tabs, then close them.
+    pub(crate) fn confirm_save_and_close(&mut self) {
+        // Save all dirty pending tabs
+        for &idx in &self.close_confirm.pending_tabs {
+            if idx < self.editor.docs.len() && self.editor.docs[idx].is_dirty() {
+                if let Some(path) = self.editor.docs[idx].path.clone() {
+                    let _ = rust_notepad::editor_state::write_document(
+                        &mut self.editor.docs[idx],
+                        path,
+                    );
+                }
+                // If no path, skip (can't auto-save untitled)
+            }
+        }
+        self.execute_pending_close();
+    }
+
+    /// Discard changes and close pending tabs.
+    pub(crate) fn confirm_discard_and_close(&mut self) {
+        self.execute_pending_close();
+    }
+
+    fn execute_pending_close(&mut self) {
+        // Close tabs in reverse order to keep indices valid
+        let mut tabs = self.close_confirm.pending_tabs.clone();
+        tabs.sort_unstable();
+        tabs.reverse();
+        for idx in tabs {
+            if idx < self.editor.docs.len() {
+                self.editor.close_tab(idx);
+            }
+        }
+        self.close_confirm.pending_tabs.clear();
+        self.close_confirm.open = false;
     }
 
     // -- File I/O (uses rfd dialogs, so must stay in UI layer) ---------------
 
     pub(crate) fn open_file(&mut self) {
-        if let Some(path) = rfd::FileDialog::new().pick_file() {
-            if let Err(e) = self.editor.open_document(path) {
-                self.editor.active_doc_mut().diagnostics = format!("Open failed: {:?}", e);
+        let paths = rfd::FileDialog::new().pick_files();
+        if let Some(paths) = paths {
+            for path in paths {
+                if let Err(e) = self.editor.open_document(path) {
+                    self.editor.active_doc_mut().diagnostics = format!("Open failed: {:?}", e);
+                }
             }
         }
     }
@@ -172,7 +349,7 @@ impl RustNotepadApp {
             self.save_active();
         } else if ctx.input_mut(|i| i.consume_shortcut(&Shortcuts::close_tab())) {
             let idx = self.editor.current_tab;
-            self.editor.close_tab(idx);
+            self.request_close_tab(idx);
         }
 
         // Search
@@ -222,6 +399,10 @@ impl RustNotepadApp {
 
 impl eframe::App for RustNotepadApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 0. Apply theme + UI zoom every frame (eframe may reset after init)
+        self.app_theme.apply(ctx);
+        ctx.set_pixels_per_point(self.view.pixels_per_point());
+
         // 1. Background tasks
         self.scan_external_changes();
         self.refresh_matches();
@@ -269,6 +450,11 @@ impl eframe::App for RustNotepadApp {
 
         // 9. Dialogs (floating windows)
         dialogs::render_go_to_line(self, ctx);
+        dialogs::render_close_confirm(self, ctx);
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.save_session();
     }
 }
 
@@ -285,6 +471,7 @@ mod tests {
             editor: EditorState::default(),
             find_state: FindState::default(),
             go_to_line: GoToLineState::default(),
+            close_confirm: CloseConfirm::default(),
             app_theme: AppTheme::Dark,
             plugins: vec![],
             last_scan: SystemTime::now(),
