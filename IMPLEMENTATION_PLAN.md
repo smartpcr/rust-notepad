@@ -2,14 +2,16 @@
 
 This plan translates `README.md` roadmap into executable phases and tracks current implementation progress in this repository.
 
+> Note: source files are named by responsibility (`core`, `editor`, `workspace`, `extensions`). The phase labels below refer to delivery milestones, not Rust module names.
+
 > **Quality gate target:** every phase should reach 100% line and branch coverage for the code introduced in that phase.
 
 ## Progress snapshot (synced)
 
-- [x] **Phase 0 module implemented** (`src/phase0.rs`)
-- [x] **Phase 1 module implemented** (`src/phase1.rs`)
-- [x] **Phase 2 module implemented** (`src/phase2.rs`)
-- [x] **Phase 3 module implemented** (`src/phase3.rs`)
+- [x] **Phase 0 module implemented** (`src/core.rs`)
+- [x] **Phase 1 module implemented** (`src/editor.rs`)
+- [x] **Phase 2 module implemented** (`src/workspace.rs`)
+- [x] **Phase 3 module implemented** (`src/extensions.rs`)
 - [x] **Core UI app scaffold present** (`src/app.rs`, `src/main.rs`)
 - [ ] **Per-phase 100% coverage CI jobs enforced** (`phase-1-coverage`, `phase-2-coverage`, etc.)
 - [ ] **Formal milestone sign-off artifacts recorded**

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, path::Path, path::PathBuf, time::SystemTime};
 
-use crate::phase0::{default_syntax_map, AppError, AppResult, Document, SearchQuery, TabId};
+use crate::core::{default_syntax_map, AppError, AppResult, Document, SearchQuery, TabId};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplaceResult {
@@ -227,7 +227,7 @@ mod tests {
         detect_external_change, find_matches, load_document, replace_all, write_document,
         EditorState,
     };
-    use crate::phase0::{AppError, Document, SearchQuery, TabId};
+    use crate::core::{AppError, Document, SearchQuery, TabId};
 
     #[test]
     fn tab_management_keeps_single_placeholder_when_closing_all() {
@@ -256,7 +256,7 @@ mod tests {
         let path = dir.path().join("sample.rs");
         fs::write(&path, "fn main() {}\n").expect("seed file");
 
-        let syntax_map = crate::phase0::default_syntax_map();
+        let syntax_map = crate::core::default_syntax_map();
         let mut doc = load_document(path.clone(), &syntax_map).expect("load document");
         assert_eq!(doc.syntax, "rust");
 
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn missing_file_maps_to_domain_error() {
-        let syntax_map = crate::phase0::default_syntax_map();
+        let syntax_map = crate::core::default_syntax_map();
         let err = load_document("missing.txt".into(), &syntax_map).expect_err("must fail");
         assert!(matches!(err, AppError::MissingFile(_)));
     }
