@@ -5,7 +5,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::phase0::{AppError, AppResult, Diagnostic, SessionState, Severity};
+use crate::core::{AppError, AppResult, Diagnostic, SessionState, Severity};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchHit {
@@ -142,7 +142,7 @@ pub fn validate_xml(raw: &str) -> Option<Diagnostic> {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::phase0::{Document, SessionState, TabId};
+    use crate::core::{Document, SessionState, TabId};
 
     use super::{
         deserialize_session, find_in_open_tabs, format_json, serialize_session, validate_json,
