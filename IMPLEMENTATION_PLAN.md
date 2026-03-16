@@ -9,7 +9,7 @@ This plan translates `README.md` roadmap into executable phases and tracks curre
 - [x] **Phase 0 module implemented** (`src/phase0.rs`)
 - [x] **Phase 1 module implemented** (`src/phase1.rs`)
 - [x] **Phase 2 module implemented** (`src/phase2.rs`)
-- [x] **Phase 3 module implemented** (`src/phase3.rs`)
+- [x] **Phase 3 module implemented** (`src/extensibility.rs`)
 - [x] **Core UI app scaffold present** (`src/app.rs`, `src/main.rs`)
 - [ ] **Per-phase 100% coverage CI jobs enforced** (`phase-1-coverage`, `phase-2-coverage`, etc.)
 - [ ] **Formal milestone sign-off artifacts recorded**

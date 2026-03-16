@@ -1,6 +1,6 @@
 use std::{fs, time::Duration};
 
-use rust_notepad::phase3::{
+use rust_notepad::extensibility::{
     line_diff, parse_manifest, project_search_with_options, render_diff, CommandRegistry,
     DiffRenderMode, MacroRecorder, PluginHost, PluginRpcRequest, PluginRpcResponse,
     PluginTransport, SearchOptions, SplitDirection, SplitLayout,
@@ -31,7 +31,7 @@ impl PluginTransport for E2ePluginTransport {
 }
 
 #[test]
-fn phase3_end_to_end_flow_works() {
+fn extensibility_end_to_end_flow_works() {
     let root = tempdir().expect("tempdir should be created");
     fs::create_dir_all(root.path().join("src")).expect("source dir should be created");
     fs::create_dir_all(root.path().join("target")).expect("target dir should be created");
