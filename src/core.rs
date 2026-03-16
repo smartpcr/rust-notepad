@@ -153,7 +153,7 @@ mod tests {
     use std::time::{Duration, UNIX_EPOCH};
 
     use super::{default_syntax_map, Document, FakeClock, SessionState, TabId};
-    use crate::phase0::Clock;
+    use crate::core::Clock;
 
     #[test]
     fn untitled_document_defaults_are_stable() {

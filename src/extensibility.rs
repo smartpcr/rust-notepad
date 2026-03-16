@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::phase0::{AppError, AppResult};
+use crate::core::{AppError, AppResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PluginManifest {
@@ -431,12 +431,12 @@ mod tests {
     }
 
     impl PluginTransport for FakePluginTransport {
-        fn send_json(&mut self, payload: &str) -> crate::phase0::AppResult<String> {
+        fn send_json(&mut self, payload: &str) -> crate::core::AppResult<String> {
             let req: super::PluginRpcRequest =
                 serde_json::from_str(payload).expect("request should be valid JSON");
             self.next_response.id = req.id;
             serde_json::to_string(&self.next_response)
-                .map_err(|err| crate::phase0::AppError::Validation(err.to_string()))
+                .map_err(|err| crate::core::AppError::Validation(err.to_string()))
         }
     }
 

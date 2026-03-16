@@ -6,7 +6,7 @@ This plan translates `README.md` roadmap into executable phases and tracks curre
 
 ## Progress snapshot (synced)
 
-- [x] **Phase 0 module implemented** (`src/phase0.rs`)
+- [x] **Phase 0 module implemented** (`src/core.rs`)
 - [x] **Phase 1 module implemented** (`src/editor_state.rs`)
 - [x] **Phase 2 module implemented** (`src/editor_services.rs`)
 - [x] **Phase 3 module implemented** (`src/extensibility.rs`)

@@ -11,7 +11,7 @@ use tempfile::tempdir;
 struct E2ePluginTransport;
 
 impl PluginTransport for E2ePluginTransport {
-    fn send_json(&mut self, payload: &str) -> rust_notepad::phase0::AppResult<String> {
+    fn send_json(&mut self, payload: &str) -> rust_notepad::core::AppResult<String> {
         let req: PluginRpcRequest =
             serde_json::from_str(payload).expect("plugin request should be valid json-rpc");
 
@@ -26,7 +26,7 @@ impl PluginTransport for E2ePluginTransport {
         };
 
         serde_json::to_string(&response)
-            .map_err(|err| rust_notepad::phase0::AppError::Validation(err.to_string()))
+            .map_err(|err| rust_notepad::core::AppError::Validation(err.to_string()))
     }
 }
 
