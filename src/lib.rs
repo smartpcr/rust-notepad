@@ -1,4 +1,4 @@
 pub mod phase0;
-pub mod phase1;
-pub mod phase2;
+pub mod editor_state;
+pub mod editor_services;
 pub mod extensibility;
