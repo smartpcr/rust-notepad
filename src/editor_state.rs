@@ -63,6 +63,69 @@ impl EditorState {
         self.current_tab = 0;
     }
 
+    pub fn next_tab(&mut self) {
+        if !self.docs.is_empty() {
+            self.current_tab = (self.current_tab + 1) % self.docs.len();
+        }
+    }
+
+    pub fn prev_tab(&mut self) {
+        if !self.docs.is_empty() {
+            self.current_tab = if self.current_tab == 0 {
+                self.docs.len() - 1
+            } else {
+                self.current_tab - 1
+            };
+        }
+    }
+
+    /// Open a file and add it as a new tab.
+    pub fn open_document(&mut self, path: PathBuf) -> AppResult<()> {
+        let mut doc = load_document(path, &self.syntax_map)?;
+        self.untitled_count += 1;
+        doc.id = TabId(self.untitled_count as u64);
+        self.docs.push(doc);
+        self.current_tab = self.docs.len() - 1;
+        Ok(())
+    }
+
+    /// Save the active document. Returns true if a path was needed (caller should prompt Save As).
+    pub fn save_active(&mut self) -> Result<bool, AppError> {
+        if self.active_doc().path.is_none() {
+            return Ok(true); // needs path
+        }
+        let path = self.active_doc().path.clone().unwrap();
+        write_document(self.active_doc_mut(), path)?;
+        Ok(false)
+    }
+
+    /// Save the active document to a specific path.
+    pub fn save_active_as(&mut self, path: PathBuf) -> AppResult<()> {
+        write_document(self.active_doc_mut(), path)
+    }
+
+    /// Save all dirty documents that have a path. Returns errors per tab index.
+    pub fn save_all(&mut self) -> Vec<(usize, String)> {
+        let mut errors = Vec::new();
+        for i in 0..self.docs.len() {
+            if self.docs[i].is_dirty() {
+                if let Some(path) = self.docs[i].path.clone() {
+                    if let Err(e) = write_document(&mut self.docs[i], path) {
+                        errors.push((i, format!("{:?}", e)));
+                    }
+                }
+            }
+        }
+        errors
+    }
+
+    /// Scan all documents for external changes.
+    pub fn scan_external_changes(&mut self) {
+        for doc in &mut self.docs {
+            doc.detect_external_changes();
+        }
+    }
+
     pub fn active_doc(&self) -> &Document {
         &self.docs[self.current_tab]
     }
@@ -99,6 +162,8 @@ pub fn load_document(
         saved_content: content,
         syntax: syntax_map.get(ext).copied().unwrap_or("txt").to_owned(),
         last_modified: fs::metadata(path).ok().and_then(|m| m.modified().ok()),
+        externally_changed: false,
+        diagnostics: String::new(),
     })
 }
 
@@ -308,6 +373,8 @@ mod tests {
             saved_content: "abc".into(),
             syntax: "txt".into(),
             last_modified: Some(UNIX_EPOCH + Duration::from_secs(5)),
+            externally_changed: false,
+            diagnostics: String::new(),
         };
         assert!(detect_external_change(
             &doc,

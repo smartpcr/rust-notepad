@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, time::SystemTime};
+use std::{collections::HashMap, fs, path::PathBuf, time::SystemTime};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +35,12 @@ pub struct Document {
     pub saved_content: String,
     pub syntax: String,
     pub last_modified: Option<SystemTime>,
+    /// Transient: true when the file was changed on disk.
+    #[serde(skip, default)]
+    pub externally_changed: bool,
+    /// Transient: diagnostic messages from plugins/validation.
+    #[serde(skip, default)]
+    pub diagnostics: String,
 }
 
 impl Document {
@@ -47,6 +53,8 @@ impl Document {
             saved_content: String::new(),
             syntax: "txt".to_owned(),
             last_modified: None,
+            externally_changed: false,
+            diagnostics: String::new(),
         }
     }
 
@@ -69,6 +77,41 @@ impl Document {
         }
         self.saved_content = self.content.clone();
         self.last_modified = timestamp;
+    }
+
+    /// Check if the file was modified externally (only for clean documents).
+    pub fn detect_external_changes(&mut self) {
+        if let Some(path) = &self.path {
+            if let Ok(metadata) = fs::metadata(path) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Some(prev) = self.last_modified {
+                        if modified > prev && !self.is_dirty() {
+                            self.externally_changed = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Reload content from disk and clear externally_changed flag.
+    pub fn reload_from_disk(&mut self) -> anyhow::Result<()> {
+        if let Some(path) = &self.path {
+            let content = fs::read_to_string(path)?;
+            self.content = content.clone();
+            self.saved_content = content;
+            self.last_modified = fs::metadata(path).ok().and_then(|m| m.modified().ok());
+            self.externally_changed = false;
+        }
+        Ok(())
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.content.lines().count().max(1)
+    }
+
+    pub fn char_count(&self) -> usize {
+        self.content.len()
     }
 }
 
@@ -145,6 +188,35 @@ pub fn default_syntax_map() -> HashMap<&'static str, &'static str> {
         ("json", "json"),
         ("xml", "xml"),
         ("txt", "txt"),
+        ("java", "java"),
+        ("cpp", "cpp"),
+        ("c", "c"),
+        ("h", "c"),
+        ("hpp", "cpp"),
+        ("go", "go"),
+        ("toml", "toml"),
+        ("md", "markdown"),
+        ("html", "html"),
+        ("htm", "html"),
+        ("css", "css"),
+        ("sql", "sql"),
+        ("sh", "bash"),
+        ("bash", "bash"),
+        ("ps1", "powershell"),
+        ("yaml", "yaml"),
+        ("yml", "yaml"),
+        ("rb", "ruby"),
+        ("cs", "csharp"),
+        ("swift", "swift"),
+        ("kt", "kotlin"),
+        ("php", "php"),
+        ("pl", "perl"),
+        ("lua", "lua"),
+        ("r", "r"),
+        ("scala", "scala"),
+        ("hs", "haskell"),
+        ("ex", "elixir"),
+        ("clj", "clojure"),
     ])
 }
 
