@@ -52,10 +52,6 @@ pub struct RustNotepadApp {
 }
 
 impl RustNotepadApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        Self::new_with_files(cc, Vec::new())
-    }
-
     pub fn new_with_files(cc: &eframe::CreationContext<'_>, initial_files: Vec<PathBuf>) -> Self {
         // Load persisted session
         let persisted = PersistedState::load();

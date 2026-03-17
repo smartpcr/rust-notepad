@@ -1,16 +1,11 @@
 use eframe::egui;
 use egui_extras::syntax_highlighting::CodeTheme;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AppTheme {
     Light,
+    #[default]
     Dark,
-}
-
-impl Default for AppTheme {
-    fn default() -> Self {
-        Self::Dark
-    }
 }
 
 impl AppTheme {

@@ -64,10 +64,6 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             egui::Stroke::NONE
         };
 
-        // Build a single button-like widget for the tab
-        let tab_label = egui::RichText::new(&tab_text).size(12.0).color(text_color);
-        let close_label = egui::RichText::new(" \u{00D7} ").size(12.0).color(dim);
-
         // Combine tab text + close into one selectable area
         let combined_text = format!("{} \u{00D7}", tab_text.trim());
         let btn = egui::Button::new(

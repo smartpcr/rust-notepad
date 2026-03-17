@@ -218,8 +218,6 @@ fn compute_brace_folds(content: &str) -> Vec<FoldRegion> {
         let mut in_string = false;
         let mut in_char = false;
         let mut escape = false;
-        let mut in_line_comment = false;
-
         let chars: Vec<char> = line.chars().collect();
         let mut i = 0;
         while i < chars.len() {
@@ -238,11 +236,6 @@ fn compute_brace_folds(content: &str) -> Vec<FoldRegion> {
 
             // Line comment
             if !in_string && !in_char && ch == '/' && i + 1 < chars.len() && chars[i + 1] == '/' {
-                in_line_comment = true;
-                break;
-            }
-
-            if in_line_comment {
                 break;
             }
 

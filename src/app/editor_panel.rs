@@ -169,10 +169,12 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                     &line_map,
                     gutter_rect,
                     &gutter_response,
-                    font_size,
-                    digit_count,
-                    show_line_numbers,
-                    fold_marker_width,
+                    &GutterParams {
+                        font_size,
+                        digit_count,
+                        show_line_numbers,
+                        fold_marker_width,
+                    },
                 );
             }
 
@@ -434,7 +436,15 @@ fn find_matching_open_brace(content: &str, start: usize, open: u8, close: u8) ->
     None
 }
 
+struct GutterParams {
+    font_size: f32,
+    digit_count: usize,
+    show_line_numbers: bool,
+    fold_marker_width: f32,
+}
+
 /// Paint gutter (line numbers + fold markers) using actual galley row positions.
+#[allow(clippy::too_many_arguments)]
 fn paint_gutter(
     ui: &egui::Ui,
     app: &mut RustNotepadApp,
@@ -442,11 +452,12 @@ fn paint_gutter(
     line_map: &[usize],
     gutter_rect: egui::Rect,
     gutter_response: &egui::Response,
-    font_size: f32,
-    digit_count: usize,
-    show_line_numbers: bool,
-    fold_marker_width: f32,
+    params: &GutterParams,
 ) {
+    let font_size = params.font_size;
+    let digit_count = params.digit_count;
+    let show_line_numbers = params.show_line_numbers;
+    let fold_marker_width = params.fold_marker_width;
     let gutter_bg = app.app_theme.gutter_bg();
     let number_color = app.app_theme.gutter_text();
     let accent = app.app_theme.accent();

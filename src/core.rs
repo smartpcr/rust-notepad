@@ -78,8 +78,9 @@ impl Default for EolStyle {
 // Detected encoding
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum DetectedEncoding {
+    #[default]
     Utf8,
     Utf8Bom,
     Utf16Le,
@@ -96,12 +97,6 @@ impl DetectedEncoding {
             DetectedEncoding::Utf16Be => "UTF-16 BE",
             DetectedEncoding::Windows1252 => "Windows-1252",
         }
-    }
-}
-
-impl Default for DetectedEncoding {
-    fn default() -> Self {
-        DetectedEncoding::Utf8
     }
 }
 
