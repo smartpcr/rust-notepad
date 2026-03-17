@@ -69,6 +69,17 @@ fn main() -> eframe::Result<()> {
             .with_title("TextEdit")
             .with_inner_size([1200.0, 800.0])
             .with_drag_and_drop(true),
+        // Allow software rendering (e.g. DX12 WARP on Windows VMs without a GPU)
+        hardware_acceleration: eframe::HardwareAcceleration::Preferred,
+        wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
+            // DX12 uses WARP software rasterizer when no GPU is present;
+            // GL kept as a secondary fallback.
+            supported_backends: eframe::wgpu::Backends::VULKAN
+                | eframe::wgpu::Backends::DX12
+                | eframe::wgpu::Backends::GL,
+            power_preference: eframe::wgpu::PowerPreference::LowPower,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let result = eframe::run_native(

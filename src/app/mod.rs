@@ -630,7 +630,7 @@ impl eframe::App for RustNotepadApp {
         dialogs::render_close_confirm(self, ctx);
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+    fn on_exit(&mut self) {
         self.save_session();
     }
 }
