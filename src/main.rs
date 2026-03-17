@@ -74,10 +74,18 @@ fn main() -> eframe::Result<()> {
         wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
             // DX12 uses WARP software rasterizer when no GPU is present;
             // GL kept as a secondary fallback.
-            supported_backends: eframe::wgpu::Backends::VULKAN
-                | eframe::wgpu::Backends::DX12
-                | eframe::wgpu::Backends::GL,
-            power_preference: eframe::wgpu::PowerPreference::LowPower,
+            wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
+                eframe::egui_wgpu::WgpuSetupCreateNew {
+                    instance_descriptor: eframe::wgpu::InstanceDescriptor {
+                        backends: eframe::wgpu::Backends::VULKAN
+                            | eframe::wgpu::Backends::DX12
+                            | eframe::wgpu::Backends::GL,
+                        ..Default::default()
+                    },
+                    power_preference: eframe::wgpu::PowerPreference::LowPower,
+                    ..Default::default()
+                },
+            ),
             ..Default::default()
         },
         ..Default::default()

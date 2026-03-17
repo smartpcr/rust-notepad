@@ -11,7 +11,7 @@ fn editor_id() -> egui::Id {
 
 pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     let syntax = app.editor.active_doc().syntax.clone();
-    let theme = app.app_theme.code_theme();
+    let theme = app.app_theme.code_theme(app.view.font_size);
     let font_size = app.view.font_size;
     let word_wrap = app.view.word_wrap;
     let show_line_numbers = app.view.show_line_numbers;
@@ -23,14 +23,14 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         egui::Color32::from_gray(180)
     };
 
-    let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
-        let mut job: LayoutJob = syntax_highlighting::highlight(ui.ctx(), &theme, string, &syntax);
+    let mut layouter = |ui: &egui::Ui, string: &dyn egui::TextBuffer, wrap_width: f32| {
+        let mut job: LayoutJob = syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, string.as_str(), &syntax);
         job.wrap.max_width = if word_wrap { wrap_width } else { f32::INFINITY };
         let mono = FontId::monospace(font_size);
         for section in &mut job.sections {
             section.format.font_id = mono.clone();
         }
-        ui.fonts(|f| f.layout_job(job))
+        ui.fonts_mut(|f| f.layout_job(job))
     };
 
     // Handle Ctrl+Scroll zoom
@@ -150,13 +150,11 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 );
                 state.cursor.set_char_range(Some(ccursor_range));
                 state.store(ui.ctx(), editor_output.response.id);
-                let primary = editor_output
-                    .galley
-                    .from_ccursor(egui::text::CCursor::new(end));
-                let secondary = editor_output
-                    .galley
-                    .from_ccursor(egui::text::CCursor::new(start));
-                editor_output.cursor_range = Some(egui::text::CursorRange { primary, secondary });
+                editor_output.cursor_range = Some(egui::text::CCursorRange {
+                    primary: egui::text::CCursor::new(end),
+                    secondary: egui::text::CCursor::new(start),
+                    h_pos: None,
+                });
                 ui.ctx().request_repaint();
             }
 
@@ -231,7 +229,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     // Extract cursor position for status bar.
     if let Some(cursor_range) = editor_output.cursor_range {
         let text = &app.editor.active_doc().content;
-        let byte_offset = cursor_range.primary.ccursor.index;
+        let byte_offset = cursor_range.primary.index;
         let clamped = byte_offset.min(text.len());
 
         let text_before = &text[..clamped];
@@ -242,8 +240,8 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         };
 
         let selection_len = {
-            let a = cursor_range.primary.ccursor.index;
-            let b = cursor_range.secondary.ccursor.index;
+            let a = cursor_range.primary.index;
+            let b = cursor_range.secondary.index;
             a.abs_diff(b)
         };
 
@@ -306,7 +304,7 @@ fn highlight_current_line(
     let galley = &output.galley;
     let text_rect = output.response.rect;
     let cursor = &cursor_range.primary;
-    let pos = galley.pos_from_cursor(cursor);
+    let pos = galley.pos_from_cursor(*cursor);
     let row_y = text_rect.top() + pos.min.y;
     let row_height = pos.max.y - pos.min.y;
 
@@ -331,7 +329,7 @@ fn highlight_matching_brace(
         Some(r) => r,
         None => return,
     };
-    let cursor_pos = cursor_range.primary.ccursor.index.min(content.len());
+    let cursor_pos = cursor_range.primary.index.min(content.len());
 
     let at_cursor = if cursor_pos < content.len() {
         Some(content.as_bytes()[cursor_pos])
@@ -377,10 +375,8 @@ fn highlight_matching_brace(
         let color = theme.brace_match_bg();
 
         for &pos in &[brace_pos, match_pos] {
-            let c_start = galley.from_ccursor(egui::text::CCursor::new(pos));
-            let c_end = galley.from_ccursor(egui::text::CCursor::new(pos + 1));
-            let p_start = galley.pos_from_cursor(&c_start);
-            let p_end = galley.pos_from_cursor(&c_end);
+            let p_start = galley.pos_from_cursor(egui::text::CCursor::new(pos));
+            let p_end = galley.pos_from_cursor(egui::text::CCursor::new(pos + 1));
 
             let rect = egui::Rect::from_min_max(
                 egui::pos2(
@@ -496,8 +492,7 @@ fn paint_gutter(
             .get(display_idx)
             .copied()
             .unwrap_or(galley_text.len());
-        let cursor = galley.from_ccursor(egui::text::CCursor::new(char_offset));
-        let pos_rect = galley.pos_from_cursor(&cursor);
+        let pos_rect = galley.pos_from_cursor(egui::text::CCursor::new(char_offset));
         let row_y = text_rect.top() + pos_rect.min.y;
         let row_height = pos_rect.max.y - pos_rect.min.y;
 
@@ -576,8 +571,7 @@ fn paint_whitespace_markers(
         };
 
         let ccursor = egui::text::CCursor::new(char_idx);
-        let rcursor = galley.from_ccursor(ccursor);
-        let pos = galley.pos_from_cursor(&rcursor);
+        let pos = galley.pos_from_cursor(ccursor);
 
         let screen_pos = egui::pos2(text_rect.left() + pos.min.x, text_rect.top() + pos.min.y);
 
@@ -604,8 +598,8 @@ fn highlight_word_occurrences(
         None => return,
     };
 
-    let a = cursor_range.primary.ccursor.index;
-    let b = cursor_range.secondary.ccursor.index;
+    let a = cursor_range.primary.index;
+    let b = cursor_range.secondary.index;
     if a == b {
         return;
     }
@@ -656,10 +650,8 @@ fn highlight_word_occurrences(
             continue;
         }
 
-        let cursor_start = galley.from_ccursor(egui::text::CCursor::new(match_start));
-        let cursor_end = galley.from_ccursor(egui::text::CCursor::new(match_end));
-        let pos_start = galley.pos_from_cursor(&cursor_start);
-        let pos_end = galley.pos_from_cursor(&cursor_end);
+        let pos_start = galley.pos_from_cursor(egui::text::CCursor::new(match_start));
+        let pos_end = galley.pos_from_cursor(egui::text::CCursor::new(match_end));
 
         let rect = egui::Rect::from_min_max(
             egui::pos2(
@@ -687,7 +679,7 @@ fn highlight_matching_tag(ui: &egui::Ui, output: &egui::text_edit::TextEditOutpu
         Some(r) => r,
         None => return,
     };
-    let cursor_pos = cursor_range.primary.ccursor.index.min(content.len());
+    let cursor_pos = cursor_range.primary.index.min(content.len());
 
     // Try to find a tag that the cursor is inside or touching.
     // Strategy: look backward for '<', check if cursor is within that tag's <...> span.
@@ -789,10 +781,8 @@ fn highlight_tag_pair(
     };
 
     for &(s, e) in &[(tag_start, tag_end), (match_start, match_end)] {
-        let c_start = galley.from_ccursor(egui::text::CCursor::new(s));
-        let c_end = galley.from_ccursor(egui::text::CCursor::new(e));
-        let p_start = galley.pos_from_cursor(&c_start);
-        let p_end = galley.pos_from_cursor(&c_end);
+        let p_start = galley.pos_from_cursor(egui::text::CCursor::new(s));
+        let p_end = galley.pos_from_cursor(egui::text::CCursor::new(e));
 
         let rect = egui::Rect::from_min_max(
             egui::pos2(
@@ -807,7 +797,7 @@ fn highlight_tag_pair(
 
         if rect.top() < clip.bottom() + 50.0 && rect.bottom() > clip.top() - 50.0 {
             ui.painter()
-                .rect_stroke(rect, 2.0, egui::Stroke::new(1.5, tag_color));
+                .rect_stroke(rect, 2.0, egui::Stroke::new(1.5, tag_color), egui::epaint::StrokeKind::Outside);
         }
     }
 }

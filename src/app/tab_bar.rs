@@ -73,11 +73,11 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         )
         .fill(bg)
         .stroke(stroke)
-        .rounding(egui::Rounding {
-            nw: 6.0,
-            ne: 6.0,
-            sw: 0.0,
-            se: 0.0,
+        .rounding(egui::CornerRadius {
+            nw: 6,
+            ne: 6,
+            sw: 0,
+            se: 0,
         });
         let response = ui.add(btn);
 

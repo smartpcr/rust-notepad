@@ -9,10 +9,10 @@ pub enum AppTheme {
 }
 
 impl AppTheme {
-    pub fn code_theme(self) -> CodeTheme {
+    pub fn code_theme(self, font_size: f32) -> CodeTheme {
         match self {
-            AppTheme::Light => CodeTheme::light(),
-            AppTheme::Dark => CodeTheme::dark(),
+            AppTheme::Light => CodeTheme::light(font_size),
+            AppTheme::Dark => CodeTheme::dark(font_size),
         }
     }
 
@@ -36,8 +36,8 @@ impl AppTheme {
         // -- Global spacing / rounding --
         style.spacing.item_spacing = egui::vec2(6.0, 4.0);
         style.spacing.button_padding = egui::vec2(8.0, 4.0);
-        style.spacing.window_margin = egui::Margin::same(10.0);
-        style.spacing.menu_margin = egui::Margin::same(8.0);
+        style.spacing.window_margin = egui::Margin::same(10);
+        style.spacing.menu_margin = egui::Margin::same(8);
 
         // Build visuals and assign into style.visuals BEFORE set_style.
         // (calling set_visuals + set_style separately causes the old visuals
@@ -73,47 +73,47 @@ impl AppTheme {
                 v.widgets.noninteractive.bg_fill = bg_panel;
                 v.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, text_secondary);
                 v.widgets.noninteractive.bg_stroke = egui::Stroke::new(0.5, border);
-                v.widgets.noninteractive.rounding = egui::Rounding::same(6.0);
+                v.widgets.noninteractive.corner_radius = egui::CornerRadius::same(6);
 
                 v.widgets.inactive.bg_fill = bg_widget;
                 v.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text_primary);
                 v.widgets.inactive.bg_stroke = egui::Stroke::new(0.5, border);
-                v.widgets.inactive.rounding = egui::Rounding::same(6.0);
+                v.widgets.inactive.corner_radius = egui::CornerRadius::same(6);
 
                 v.widgets.hovered.bg_fill = bg_hover;
                 v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
                 v.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, accent_dim);
-                v.widgets.hovered.rounding = egui::Rounding::same(6.0);
+                v.widgets.hovered.corner_radius = egui::CornerRadius::same(6);
                 v.widgets.hovered.expansion = 1.0;
 
                 v.widgets.active.bg_fill = bg_active;
                 v.widgets.active.fg_stroke = egui::Stroke::new(1.5, egui::Color32::WHITE);
                 v.widgets.active.bg_stroke = egui::Stroke::new(1.5, accent);
-                v.widgets.active.rounding = egui::Rounding::same(6.0);
+                v.widgets.active.corner_radius = egui::CornerRadius::same(6);
 
                 v.widgets.open.bg_fill = bg_hover;
                 v.widgets.open.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
                 v.widgets.open.bg_stroke = egui::Stroke::new(1.0, accent_dim);
-                v.widgets.open.rounding = egui::Rounding::same(6.0);
+                v.widgets.open.corner_radius = egui::CornerRadius::same(6);
 
                 // Window styling
-                v.window_rounding = egui::Rounding::same(10.0);
+                v.window_corner_radius = egui::CornerRadius::same(10);
                 v.window_shadow = egui::epaint::Shadow {
-                    offset: egui::vec2(0.0, 4.0),
-                    blur: 16.0,
-                    spread: 2.0,
+                    offset: [0, 4],
+                    blur: 16,
+                    spread: 2,
                     color: egui::Color32::from_black_alpha(80),
                 };
                 v.window_stroke = egui::Stroke::new(1.0, border);
 
                 // Popups / menus
                 v.popup_shadow = egui::epaint::Shadow {
-                    offset: egui::vec2(0.0, 3.0),
-                    blur: 12.0,
-                    spread: 1.0,
+                    offset: [0, 3],
+                    blur: 12,
+                    spread: 1,
                     color: egui::Color32::from_black_alpha(60),
                 };
-                v.menu_rounding = egui::Rounding::same(8.0);
+                v.menu_corner_radius = egui::CornerRadius::same(8);
 
                 // Misc
                 v.resize_corner_size = 10.0;
@@ -150,45 +150,45 @@ impl AppTheme {
                 v.widgets.noninteractive.bg_fill = bg_panel;
                 v.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, text_secondary);
                 v.widgets.noninteractive.bg_stroke = egui::Stroke::new(0.5, border);
-                v.widgets.noninteractive.rounding = egui::Rounding::same(6.0);
+                v.widgets.noninteractive.corner_radius = egui::CornerRadius::same(6);
 
                 v.widgets.inactive.bg_fill = bg_widget;
                 v.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, text_primary);
                 v.widgets.inactive.bg_stroke = egui::Stroke::new(0.5, border);
-                v.widgets.inactive.rounding = egui::Rounding::same(6.0);
+                v.widgets.inactive.corner_radius = egui::CornerRadius::same(6);
 
                 v.widgets.hovered.bg_fill = bg_hover;
                 v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, text_primary);
                 v.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, accent_dim);
-                v.widgets.hovered.rounding = egui::Rounding::same(6.0);
+                v.widgets.hovered.corner_radius = egui::CornerRadius::same(6);
                 v.widgets.hovered.expansion = 1.0;
 
                 v.widgets.active.bg_fill = bg_active;
                 v.widgets.active.fg_stroke = egui::Stroke::new(1.5, text_primary);
                 v.widgets.active.bg_stroke = egui::Stroke::new(1.5, accent);
-                v.widgets.active.rounding = egui::Rounding::same(6.0);
+                v.widgets.active.corner_radius = egui::CornerRadius::same(6);
 
                 v.widgets.open.bg_fill = bg_hover;
                 v.widgets.open.fg_stroke = egui::Stroke::new(1.0, text_primary);
                 v.widgets.open.bg_stroke = egui::Stroke::new(1.0, accent_dim);
-                v.widgets.open.rounding = egui::Rounding::same(6.0);
+                v.widgets.open.corner_radius = egui::CornerRadius::same(6);
 
-                v.window_rounding = egui::Rounding::same(10.0);
+                v.window_corner_radius = egui::CornerRadius::same(10);
                 v.window_shadow = egui::epaint::Shadow {
-                    offset: egui::vec2(0.0, 4.0),
-                    blur: 16.0,
-                    spread: 2.0,
+                    offset: [0, 4],
+                    blur: 16,
+                    spread: 2,
                     color: egui::Color32::from_black_alpha(30),
                 };
                 v.window_stroke = egui::Stroke::new(1.0, border);
 
                 v.popup_shadow = egui::epaint::Shadow {
-                    offset: egui::vec2(0.0, 3.0),
-                    blur: 12.0,
-                    spread: 1.0,
+                    offset: [0, 3],
+                    blur: 12,
+                    spread: 1,
                     color: egui::Color32::from_black_alpha(20),
                 };
-                v.menu_rounding = egui::Rounding::same(8.0);
+                v.menu_corner_radius = egui::CornerRadius::same(8);
 
                 v.resize_corner_size = 10.0;
                 v.clip_rect_margin = 3.0;
