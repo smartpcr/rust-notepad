@@ -24,7 +24,8 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     };
 
     let mut layouter = |ui: &egui::Ui, string: &dyn egui::TextBuffer, wrap_width: f32| {
-        let mut job: LayoutJob = syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, string.as_str(), &syntax);
+        let mut job: LayoutJob =
+            syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, string.as_str(), &syntax);
         job.wrap.max_width = if word_wrap { wrap_width } else { f32::INFINITY };
         let mono = FontId::monospace(font_size);
         for section in &mut job.sections {
@@ -796,8 +797,12 @@ fn highlight_tag_pair(
         );
 
         if rect.top() < clip.bottom() + 50.0 && rect.bottom() > clip.top() - 50.0 {
-            ui.painter()
-                .rect_stroke(rect, 2.0, egui::Stroke::new(1.5, tag_color), egui::epaint::StrokeKind::Outside);
+            ui.painter().rect_stroke(
+                rect,
+                2.0,
+                egui::Stroke::new(1.5, tag_color),
+                egui::epaint::StrokeKind::Outside,
+            );
         }
     }
 }
