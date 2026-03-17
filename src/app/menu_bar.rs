@@ -186,7 +186,11 @@ fn render_view_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             for size in &[2u8, 4, 8] {
                 let label = format!(
                     "{} {}",
-                    if app.view.tab_size == *size { "\u{2713}" } else { "  " },
+                    if app.view.tab_size == *size {
+                        "\u{2713}"
+                    } else {
+                        "  "
+                    },
                     size
                 );
                 if ui.button(label).clicked() {

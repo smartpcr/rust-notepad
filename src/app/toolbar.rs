@@ -4,20 +4,16 @@ use super::RustNotepadApp;
 
 /// Styled toolbar button — compact, with icon and optional label.
 fn tool_btn(ui: &mut egui::Ui, icon: &str, tooltip: &str) -> bool {
-    let btn = egui::Button::new(
-        egui::RichText::new(icon).size(15.0),
-    )
-    .min_size(egui::vec2(28.0, 24.0));
+    let btn =
+        egui::Button::new(egui::RichText::new(icon).size(15.0)).min_size(egui::vec2(28.0, 24.0));
     ui.add(btn).on_hover_text(tooltip).clicked()
 }
 
 /// Toolbar button with icon + text label.
 fn tool_btn_label(ui: &mut egui::Ui, icon: &str, label: &str, tooltip: &str) -> bool {
     let text = format!("{} {}", icon, label);
-    let btn = egui::Button::new(
-        egui::RichText::new(text).size(12.0),
-    )
-    .min_size(egui::vec2(0.0, 24.0));
+    let btn =
+        egui::Button::new(egui::RichText::new(text).size(12.0)).min_size(egui::vec2(0.0, 24.0));
     ui.add(btn).on_hover_text(tooltip).clicked()
 }
 

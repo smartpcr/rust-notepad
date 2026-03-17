@@ -24,8 +24,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     };
 
     let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
-        let mut job: LayoutJob =
-            syntax_highlighting::highlight(ui.ctx(), &theme, string, &syntax);
+        let mut job: LayoutJob = syntax_highlighting::highlight(ui.ctx(), &theme, string, &syntax);
         job.wrap.max_width = if word_wrap { wrap_width } else { f32::INFINITY };
         let mono = FontId::monospace(font_size);
         for section in &mut job.sections {
@@ -73,7 +72,11 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     let total_real_lines = content_for_folds.lines().count().max(1);
     let digit_count = format!("{}", total_real_lines).len().max(2);
     let has_fold_regions = !app.editor.active_doc().fold_state.regions().is_empty();
-    let fold_marker_width = if has_fold_regions { font_size * 1.2 } else { 0.0 };
+    let fold_marker_width = if has_fold_regions {
+        font_size * 1.2
+    } else {
+        0.0
+    };
     let gutter_width = if show_line_numbers || has_fold_regions {
         let num_width = if show_line_numbers {
             (digit_count as f32 + 1.0) * font_size * 0.6
@@ -147,16 +150,13 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 );
                 state.cursor.set_char_range(Some(ccursor_range));
                 state.store(ui.ctx(), editor_output.response.id);
-                let primary =
-                    editor_output
-                        .galley
-                        .from_ccursor(egui::text::CCursor::new(end));
-                let secondary =
-                    editor_output
-                        .galley
-                        .from_ccursor(egui::text::CCursor::new(start));
-                editor_output.cursor_range =
-                    Some(egui::text::CursorRange { primary, secondary });
+                let primary = editor_output
+                    .galley
+                    .from_ccursor(egui::text::CCursor::new(end));
+                let secondary = editor_output
+                    .galley
+                    .from_ccursor(egui::text::CCursor::new(start));
+                editor_output.cursor_range = Some(egui::text::CursorRange { primary, secondary });
                 ui.ctx().request_repaint();
             }
 
@@ -203,8 +203,17 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             // -- XML tag matching --
             let is_xml_like = matches!(
                 app.editor.active_doc().syntax.as_str(),
-                "xml" | "html" | "htm" | "svg" | "xaml" | "xsl" | "xslt" | "xsd" | "jsp"
-                    | "vue" | "svelte"
+                "xml"
+                    | "html"
+                    | "htm"
+                    | "svg"
+                    | "xaml"
+                    | "xsl"
+                    | "xslt"
+                    | "xsd"
+                    | "jsp"
+                    | "vue"
+                    | "svelte"
             );
             if is_xml_like {
                 highlight_matching_tag(ui, &editor_output, content_ref);
@@ -255,14 +264,18 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                     let before_newline = &content[..clamped - 1];
                     let prev_line_start = before_newline.rfind('\n').map(|i| i + 1).unwrap_or(0);
                     let prev_line = &content[prev_line_start..clamped - 1];
-                    let indent: String =
-                        prev_line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+                    let indent: String = prev_line
+                        .chars()
+                        .take_while(|c| *c == ' ' || *c == '\t')
+                        .collect();
 
                     if !indent.is_empty() {
                         // Check if there's already indentation after the newline
                         let after = &content[clamped..];
-                        let existing_indent: String =
-                            after.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+                        let existing_indent: String = after
+                            .chars()
+                            .take_while(|c| *c == ' ' || *c == '\t')
+                            .collect();
                         if existing_indent.is_empty() {
                             app.editor
                                 .active_doc_mut()
@@ -329,18 +342,17 @@ fn highlight_matching_brace(
         None
     };
 
-    let (brace_pos, is_open) =
-        if matches!(at_cursor, Some(b'{') | Some(b'(') | Some(b'[')) {
-            (cursor_pos, true)
-        } else if matches!(before_cursor, Some(b'}') | Some(b')') | Some(b']')) {
-            (cursor_pos - 1, false)
-        } else if matches!(at_cursor, Some(b'}') | Some(b')') | Some(b']')) {
-            (cursor_pos, false)
-        } else if matches!(before_cursor, Some(b'{') | Some(b'(') | Some(b'[')) {
-            (cursor_pos - 1, true)
-        } else {
-            return;
-        };
+    let (brace_pos, is_open) = if matches!(at_cursor, Some(b'{') | Some(b'(') | Some(b'[')) {
+        (cursor_pos, true)
+    } else if matches!(before_cursor, Some(b'}') | Some(b')') | Some(b']')) {
+        (cursor_pos - 1, false)
+    } else if matches!(at_cursor, Some(b'}') | Some(b')') | Some(b']')) {
+        (cursor_pos, false)
+    } else if matches!(before_cursor, Some(b'{') | Some(b'(') | Some(b'[')) {
+        (cursor_pos - 1, true)
+    } else {
+        return;
+    };
 
     let brace = content.as_bytes()[brace_pos];
     let (open, close) = match brace {
@@ -369,8 +381,14 @@ fn highlight_matching_brace(
             let p_end = galley.pos_from_cursor(&c_end);
 
             let rect = egui::Rect::from_min_max(
-                egui::pos2(text_rect.left() + p_start.min.x, text_rect.top() + p_start.min.y),
-                egui::pos2(text_rect.left() + p_end.max.x, text_rect.top() + p_end.max.y),
+                egui::pos2(
+                    text_rect.left() + p_start.min.x,
+                    text_rect.top() + p_start.min.y,
+                ),
+                egui::pos2(
+                    text_rect.left() + p_end.max.x,
+                    text_rect.top() + p_end.max.y,
+                ),
             );
 
             if rect.top() < clip.bottom() + 50.0 && rect.bottom() > clip.top() - 50.0 {
@@ -441,7 +459,10 @@ fn paint_gutter(
     // Extend gutter to match the editor height
     let full_gutter = egui::Rect::from_min_max(
         gutter_rect.min,
-        egui::pos2(gutter_rect.right(), gutter_rect.bottom().max(text_rect.bottom())),
+        egui::pos2(
+            gutter_rect.right(),
+            gutter_rect.bottom().max(text_rect.bottom()),
+        ),
     );
     ui.painter().rect_filled(full_gutter, 0.0, gutter_bg);
 
@@ -650,11 +671,7 @@ fn highlight_word_occurrences(
 
 /// For XML/HTML files, highlight matching open/close tag.
 /// Find the tag at or near cursor_pos and highlight its matching partner.
-fn highlight_matching_tag(
-    ui: &egui::Ui,
-    output: &egui::text_edit::TextEditOutput,
-    content: &str,
-) {
+fn highlight_matching_tag(ui: &egui::Ui, output: &egui::text_edit::TextEditOutput, content: &str) {
     let cursor_range = match &output.cursor_range {
         Some(r) => r,
         None => return,
@@ -837,11 +854,7 @@ fn find_matching_close_tag(content: &str, after: usize, tag_name: &str) -> Optio
     None
 }
 
-fn find_matching_open_tag(
-    content: &str,
-    before: usize,
-    tag_name: &str,
-) -> Option<(usize, usize)> {
+fn find_matching_open_tag(content: &str, before: usize, tag_name: &str) -> Option<(usize, usize)> {
     let open_pattern = format!("<{}", tag_name);
     let close_pattern = format!("</{}", tag_name);
     let mut depth = 1i32;
@@ -866,10 +879,7 @@ fn find_matching_open_tag(
                     let after_name_o = abs_o + open_pattern.len();
                     if after_name_o < search_area.len() {
                         let next_ch = search_area.as_bytes()[after_name_o];
-                        if next_ch == b'>'
-                            || next_ch == b' '
-                            || next_ch == b'\t'
-                            || next_ch == b'/'
+                        if next_ch == b'>' || next_ch == b' ' || next_ch == b'\t' || next_ch == b'/'
                         {
                             if let Some(tag_close) = search_area[abs_o..].find('>') {
                                 let tag_slice = &search_area[abs_o..abs_o + tag_close];
@@ -889,11 +899,7 @@ fn find_matching_open_tag(
             let after_name = abs + open_pattern.len();
             if after_name < search_area.len() {
                 let next_ch = search_area.as_bytes()[after_name];
-                if next_ch == b'>'
-                    || next_ch == b' '
-                    || next_ch == b'\t'
-                    || next_ch == b'/'
-                {
+                if next_ch == b'>' || next_ch == b' ' || next_ch == b'\t' || next_ch == b'/' {
                     if let Some(tag_close) = search_area[abs..].find('>') {
                         let tag_slice = &search_area[abs..abs + tag_close];
                         if !tag_slice.ends_with('/') {

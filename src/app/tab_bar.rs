@@ -50,7 +50,11 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         };
 
         let text_color = if is_active { active_text } else { dim };
-        let bg = if is_active { active_bg } else { egui::Color32::TRANSPARENT };
+        let bg = if is_active {
+            active_bg
+        } else {
+            egui::Color32::TRANSPARENT
+        };
         let stroke = if is_active {
             egui::Stroke::new(
                 1.0,
@@ -66,15 +70,19 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
 
         // Combine tab text + close into one selectable area
         let combined_text = format!("{} \u{00D7}", tab_text.trim());
-        let btn = egui::Button::new(egui::RichText::new(&combined_text).size(12.0).color(text_color))
-            .fill(bg)
-            .stroke(stroke)
-            .rounding(egui::Rounding {
-                nw: 6.0,
-                ne: 6.0,
-                sw: 0.0,
-                se: 0.0,
-            });
+        let btn = egui::Button::new(
+            egui::RichText::new(&combined_text)
+                .size(12.0)
+                .color(text_color),
+        )
+        .fill(bg)
+        .stroke(stroke)
+        .rounding(egui::Rounding {
+            nw: 6.0,
+            ne: 6.0,
+            sw: 0.0,
+            se: 0.0,
+        });
         let response = ui.add(btn);
 
         if response.clicked() {

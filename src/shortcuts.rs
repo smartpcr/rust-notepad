@@ -15,10 +15,7 @@ impl Shortcuts {
         egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::S)
     }
     pub fn save_as() -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(
-            egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
-            egui::Key::S,
-        )
+        egui::KeyboardShortcut::new(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::S)
     }
     pub fn close_tab() -> egui::KeyboardShortcut {
         egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::W)

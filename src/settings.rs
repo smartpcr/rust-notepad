@@ -281,7 +281,10 @@ mod tests {
 
     #[test]
     fn zoom_clamps_at_bounds() {
-        let mut view = ViewSettings { font_size: 72.0, ..Default::default() };
+        let mut view = ViewSettings {
+            font_size: 72.0,
+            ..Default::default()
+        };
         view.zoom_in();
         assert_eq!(view.font_size, 72.0);
 

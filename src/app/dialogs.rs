@@ -137,8 +137,7 @@ pub fn render_go_to_line(app: &mut RustNotepadApp, ctx: &egui::Context) {
             response.request_focus();
 
             // Enter in the text field = submit (lost_focus + Enter is the egui pattern)
-            let submitted = response.lost_focus()
-                && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            let submitted = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
             ui.add_space(8.0);
 

@@ -1,10 +1,10 @@
-mod menu_bar;
-mod toolbar;
-mod tab_bar;
-mod find_panel;
-mod editor_panel;
-mod status_bar;
 mod dialogs;
+mod editor_panel;
+mod find_panel;
+mod menu_bar;
+mod status_bar;
+mod tab_bar;
+mod toolbar;
 
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -114,7 +114,9 @@ impl RustNotepadApp {
             }
             // Restore active tab index (only if no CLI files were opened)
             if initial_files.is_empty() {
-                editor.current_tab = persisted.active_tab.min(editor.docs.len().saturating_sub(1));
+                editor.current_tab = persisted
+                    .active_tab
+                    .min(editor.docs.len().saturating_sub(1));
             }
         }
 
@@ -136,11 +138,16 @@ impl RustNotepadApp {
         }
     }
 
-    fn create_watcher() -> (Option<notify::RecommendedWatcher>, Option<mpsc::Receiver<notify::Result<notify::Event>>>) {
+    fn create_watcher() -> (
+        Option<notify::RecommendedWatcher>,
+        Option<mpsc::Receiver<notify::Result<notify::Event>>>,
+    ) {
         use notify::Watcher;
         let (tx, rx) = mpsc::channel();
         match notify::RecommendedWatcher::new(
-            move |res| { let _ = tx.send(res); },
+            move |res| {
+                let _ = tx.send(res);
+            },
             notify::Config::default(),
         ) {
             Ok(w) => (Some(w), Some(rx)),
@@ -472,7 +479,9 @@ impl RustNotepadApp {
                 format!("(?i){}", query_str)
             };
             if let Ok(re) = regex::Regex::new(&pattern) {
-                let new_content = re.replace_all(&self.editor.active_doc().content, replacement.as_str()).to_string();
+                let new_content = re
+                    .replace_all(&self.editor.active_doc().content, replacement.as_str())
+                    .to_string();
                 self.editor.active_doc_mut().content = new_content;
             }
         } else {

@@ -52,12 +52,12 @@ impl AppTheme {
                 let mut v = egui::Visuals::dark();
 
                 // Base palette — deep blue-grey with translucent panels
-                let bg_base = egui::Color32::from_rgb(22, 24, 33);       // very dark blue
+                let bg_base = egui::Color32::from_rgb(22, 24, 33); // very dark blue
                 let bg_panel = egui::Color32::from_rgba_unmultiplied(30, 33, 46, 240); // slight transparency
                 let bg_widget = egui::Color32::from_rgb(40, 44, 62);
                 let bg_hover = egui::Color32::from_rgb(50, 55, 78);
                 let bg_active = egui::Color32::from_rgb(60, 66, 92);
-                let accent = egui::Color32::from_rgb(100, 140, 255);     // bright blue accent
+                let accent = egui::Color32::from_rgb(100, 140, 255); // bright blue accent
                 let accent_dim = egui::Color32::from_rgb(70, 100, 200);
                 let text_primary = egui::Color32::from_rgb(220, 225, 240);
                 let text_secondary = egui::Color32::from_rgb(150, 158, 180);

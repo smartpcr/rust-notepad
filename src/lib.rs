@@ -1,9 +1,9 @@
 pub mod core;
-pub mod editor_state;
 pub mod editor_services;
+pub mod editor_state;
 pub mod extensibility;
-pub mod theme;
-pub mod shortcuts;
-pub mod settings;
-pub mod plugins;
 pub mod folding;
+pub mod plugins;
+pub mod settings;
+pub mod shortcuts;
+pub mod theme;

@@ -73,11 +73,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 .color(accent),
         );
     } else {
-        ui.label(
-            egui::RichText::new("No matches")
-                .size(11.0)
-                .color(dim),
-        );
+        ui.label(egui::RichText::new("No matches").size(11.0).color(dim));
     }
 
     // Build result display strings with line number and context
@@ -116,10 +112,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                     .size(11.0)
                     .color(if is_selected { accent } else { dim })
                     .family(egui::FontFamily::Monospace);
-                if ui
-                    .selectable_label(is_selected, text)
-                    .clicked()
-                {
+                if ui.selectable_label(is_selected, text).clicked() {
                     clicked_idx = Some(idx);
                 }
             }
@@ -136,20 +129,11 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         if let Some(folder) = rfd::FileDialog::new().pick_folder() {
             let query = app.find_state.query.clone();
             if !query.is_empty() {
-                let results = rust_notepad::extensibility::project_search(
-                    &folder,
-                    &query,
-                );
+                let results = rust_notepad::extensibility::project_search(&folder, &query);
                 if let Ok(hits) = results {
                     app.find_state.file_results = hits
                         .iter()
-                        .map(|h| {
-                            (
-                                h.file.display().to_string(),
-                                h.line,
-                                h.text.clone(),
-                            )
-                        })
+                        .map(|h| (h.file.display().to_string(), h.line, h.text.clone()))
                         .collect();
                     app.find_state.show_find_in_files = true;
                 }
@@ -160,12 +144,9 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     if app.find_state.show_find_in_files && !app.find_state.file_results.is_empty() {
         ui.add_space(4.0);
         ui.label(
-            egui::RichText::new(format!(
-                "Files: {} hits",
-                app.find_state.file_results.len()
-            ))
-            .size(11.0)
-            .color(accent),
+            egui::RichText::new(format!("Files: {} hits", app.find_state.file_results.len()))
+                .size(11.0)
+                .color(accent),
         );
         let mut open_path: Option<String> = None;
         egui::ScrollArea::vertical()

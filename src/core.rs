@@ -357,46 +357,46 @@ pub fn default_syntax_map() -> HashMap<&'static str, &'static str> {
         ("yaml", "yaml"),
         ("yml", "yaml"),
         ("rb", "rb"),
-        ("cs", "cs"),       // C#
+        ("cs", "cs"), // C#
         ("csx", "cs"),
         ("php", "php"),
-        ("pl", "pl"),       // Perl
+        ("pl", "pl"), // Perl
         ("pm", "pl"),
         ("lua", "lua"),
         ("r", "r"),
         ("R", "r"),
         ("scala", "scala"),
         ("sbt", "scala"),
-        ("hs", "hs"),       // Haskell
-        ("clj", "clj"),     // Clojure
+        ("hs", "hs"),   // Haskell
+        ("clj", "clj"), // Clojure
         ("d", "d"),
-        ("pas", "pas"),     // Pascal
+        ("pas", "pas"), // Pascal
         ("p", "pas"),
         ("bat", "bat"),
         ("cmd", "bat"),
-        ("erl", "erl"),     // Erlang
+        ("erl", "erl"), // Erlang
         ("hrl", "erl"),
         ("lisp", "lisp"),
         ("cl", "lisp"),
         ("el", "lisp"),
-        ("ml", "ml"),       // OCaml
+        ("ml", "ml"), // OCaml
         ("mli", "ml"),
-        ("m", "m"),         // Objective-C
-        ("mm", "mm"),       // Objective-C++
+        ("m", "m"),   // Objective-C
+        ("mm", "mm"), // Objective-C++
         ("groovy", "groovy"),
         ("gradle", "groovy"),
         ("diff", "diff"),
         ("patch", "diff"),
-        ("tex", "tex"),     // LaTeX
+        ("tex", "tex"), // LaTeX
         ("ltx", "tex"),
-        ("re", "re"),       // Regular expression
-        ("dot", "dot"),     // Graphviz
+        ("re", "re"),   // Regular expression
+        ("dot", "dot"), // Graphviz
         ("gv", "dot"),
         ("tcl", "tcl"),
         ("haml", "haml"),
         ("erb", "rails"),
         ("properties", "properties"),
-        ("mk", "make"),     // Makefile
+        ("mk", "make"), // Makefile
         ("make", "make"),
         // === XML-based formats (use xml syntax) ===
         ("csproj", "xml"),
@@ -425,21 +425,21 @@ pub fn default_syntax_map() -> HashMap<&'static str, &'static str> {
         // === Languages NOT in syntect defaults (fall back to plain text) ===
         // These are mapped but syntect will silently render as plain text.
         // When we add custom syntax loading, these will work.
-        ("ts", "js"),       // TypeScript → highlight as JavaScript (close enough)
+        ("ts", "js"), // TypeScript → highlight as JavaScript (close enough)
         ("tsx", "js"),
         ("jsx", "js"),
-        ("toml", "yaml"),   // TOML → highlight as YAML (similar key-value style)
+        ("toml", "yaml"), // TOML → highlight as YAML (similar key-value style)
         ("ini", "yaml"),
         ("cfg", "yaml"),
         ("conf", "yaml"),
-        ("ps1", "sh"),      // PowerShell → highlight as Shell (better than nothing)
+        ("ps1", "sh"), // PowerShell → highlight as Shell (better than nothing)
         ("psm1", "sh"),
         ("psd1", "sh"),
-        ("swift", "java"),  // Swift → Java (similar C-style syntax)
-        ("kt", "java"),     // Kotlin → Java
-        ("dart", "java"),   // Dart → Java
-        ("lock", "yaml"),   // Cargo.lock → YAML
-        ("csv", "txt"),     // CSV → plain text
+        ("swift", "java"), // Swift → Java (similar C-style syntax)
+        ("kt", "java"),    // Kotlin → Java
+        ("dart", "java"),  // Dart → Java
+        ("lock", "yaml"),  // Cargo.lock → YAML
+        ("csv", "txt"),    // CSV → plain text
         ("tsv", "txt"),
         ("log", "txt"),
     ])
@@ -500,10 +500,10 @@ mod tests {
         assert_eq!(syntax.get("rs"), Some(&"rs"));
         assert_eq!(syntax.get("txt"), Some(&"txt"));
         assert_eq!(syntax.get("cs"), Some(&"cs"));
-        assert_eq!(syntax.get("ps1"), Some(&"sh"));   // PowerShell → sh fallback
+        assert_eq!(syntax.get("ps1"), Some(&"sh")); // PowerShell → sh fallback
         assert_eq!(syntax.get("csproj"), Some(&"xml"));
-        assert_eq!(syntax.get("csv"), Some(&"txt"));   // CSV → plain text
-        assert_eq!(syntax.get("ts"), Some(&"js"));     // TypeScript → JS fallback
+        assert_eq!(syntax.get("csv"), Some(&"txt")); // CSV → plain text
+        assert_eq!(syntax.get("ts"), Some(&"js")); // TypeScript → JS fallback
     }
 
     #[test]
@@ -531,7 +531,10 @@ mod tests {
 
     #[test]
     fn shebang_detection() {
-        assert_eq!(detect_syntax_from_shebang("#!/usr/bin/env python3\n"), Some("py"));
+        assert_eq!(
+            detect_syntax_from_shebang("#!/usr/bin/env python3\n"),
+            Some("py")
+        );
         assert_eq!(detect_syntax_from_shebang("#!/bin/bash\n"), Some("sh"));
         assert_eq!(detect_syntax_from_shebang("#!/usr/bin/node\n"), Some("js"));
         assert_eq!(detect_syntax_from_shebang("#!/usr/bin/ruby\n"), Some("rb"));

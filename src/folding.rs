@@ -91,10 +91,7 @@ impl FoldState {
     fn nesting_depth(&self, target: &FoldRegion) -> usize {
         self.regions
             .iter()
-            .filter(|r| {
-                r.start_line < target.start_line
-                    && r.end_line > target.end_line
-            })
+            .filter(|r| r.start_line < target.start_line && r.end_line > target.end_line)
             .count()
     }
 

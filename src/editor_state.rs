@@ -286,7 +286,11 @@ pub fn find_matches(haystack: &str, query: &SearchQuery) -> Vec<usize> {
 }
 
 /// Find matches using regex. Returns (positions, match_lengths).
-pub fn find_matches_regex(haystack: &str, pattern: &str, case_sensitive: bool) -> Option<(Vec<usize>, Vec<usize>)> {
+pub fn find_matches_regex(
+    haystack: &str,
+    pattern: &str,
+    case_sensitive: bool,
+) -> Option<(Vec<usize>, Vec<usize>)> {
     let pattern = if case_sensitive {
         pattern.to_string()
     } else {
