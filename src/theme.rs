@@ -257,6 +257,20 @@ impl AppTheme {
             AppTheme::Light => egui::Color32::from_rgb(150, 158, 175),
         }
     }
+
+    pub fn current_line_bg(self) -> egui::Color32 {
+        match self {
+            AppTheme::Dark => egui::Color32::from_rgba_unmultiplied(255, 255, 255, 12),
+            AppTheme::Light => egui::Color32::from_rgba_unmultiplied(0, 0, 0, 10),
+        }
+    }
+
+    pub fn brace_match_bg(self) -> egui::Color32 {
+        match self {
+            AppTheme::Dark => egui::Color32::from_rgba_unmultiplied(100, 200, 255, 50),
+            AppTheme::Light => egui::Color32::from_rgba_unmultiplied(0, 100, 200, 60),
+        }
+    }
 }
 
 #[cfg(test)]

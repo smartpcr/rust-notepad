@@ -1,4 +1,5 @@
 use eframe::egui;
+use rust_notepad::core::EolStyle;
 use rust_notepad::shortcuts::{menu_item, Shortcuts};
 
 use super::RustNotepadApp;
@@ -40,6 +41,35 @@ fn render_file_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             ui.close_menu();
         }
         ui.separator();
+        // Recent Files
+        let recent = app.recent_files.clone();
+        if !recent.is_empty() {
+            ui.menu_button("Recent Files", |ui| {
+                for path_str in &recent {
+                    let display = if path_str.len() > 50 {
+                        format!("...{}", &path_str[path_str.len() - 47..])
+                    } else {
+                        path_str.clone()
+                    };
+                    if ui.button(&display).clicked() {
+                        let path = std::path::PathBuf::from(path_str);
+                        if path.exists() {
+                            if let Err(e) = app.editor.open_document(path) {
+                                app.editor.active_doc_mut().diagnostics =
+                                    format!("Open failed: {:?}", e);
+                            }
+                        }
+                        ui.close_menu();
+                    }
+                }
+                ui.separator();
+                if ui.button("Clear Recent Files").clicked() {
+                    app.recent_files.clear();
+                    ui.close_menu();
+                }
+            });
+            ui.separator();
+        }
         if menu_item(ui, "Close", &Shortcuts::close_tab()) {
             let idx = app.editor.current_tab;
             app.request_close_tab(idx);
@@ -73,6 +103,40 @@ fn render_edit_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         if ui.button("Convert to lowercase").clicked() {
             let doc = app.editor.active_doc_mut();
             doc.content = doc.content.to_lowercase();
+            ui.close_menu();
+        }
+        ui.separator();
+
+        // EOL conversion
+        ui.menu_button("EOL Conversion", |ui| {
+            let current = app.editor.active_doc().eol_style;
+            for eol in &[EolStyle::LF, EolStyle::CRLF, EolStyle::CR] {
+                let label = format!(
+                    "{} {}",
+                    if current == *eol { "\u{2713}" } else { "  " },
+                    eol.label()
+                );
+                if ui.button(label).clicked() {
+                    app.editor.active_doc_mut().eol_style = *eol;
+                    ui.close_menu();
+                }
+            }
+        });
+
+        ui.separator();
+
+        // Tab-to-spaces / spaces-to-tabs
+        let tab_size = app.view.tab_size as usize;
+        if ui.button("Convert Tabs to Spaces").clicked() {
+            let spaces: String = " ".repeat(tab_size);
+            let doc = app.editor.active_doc_mut();
+            doc.content = doc.content.replace('\t', &spaces);
+            ui.close_menu();
+        }
+        if ui.button("Convert Spaces to Tabs").clicked() {
+            let spaces: String = " ".repeat(tab_size);
+            let doc = app.editor.active_doc_mut();
+            doc.content = doc.content.replace(&spaces, "\t");
             ui.close_menu();
         }
     });
@@ -114,7 +178,25 @@ fn render_view_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         ui.checkbox(&mut app.view.word_wrap, "Word Wrap          Alt+Z");
         ui.checkbox(&mut app.view.show_whitespace, "Show Whitespace");
         ui.checkbox(&mut app.view.tab_wrap, "Wrap Tabs (multi-line)");
+        ui.checkbox(&mut app.view.auto_indent, "Auto Indent");
         ui.separator();
+
+        // Tab size
+        ui.menu_button(format!("Tab Size: {}", app.view.tab_size), |ui| {
+            for size in &[2u8, 4, 8] {
+                let label = format!(
+                    "{} {}",
+                    if app.view.tab_size == *size { "\u{2713}" } else { "  " },
+                    size
+                );
+                if ui.button(label).clicked() {
+                    app.view.tab_size = *size;
+                    ui.close_menu();
+                }
+            }
+        });
+        ui.separator();
+
         ui.horizontal(|ui| {
             ui.label("Editor Font:");
             if ui.button("-").clicked() {
@@ -148,6 +230,15 @@ fn render_view_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             app.editor.active_doc_mut().fold_state.unfold_all();
             ui.close_menu();
         }
+        // Fold levels
+        ui.menu_button("Fold Level", |ui| {
+            for level in 1..=8 {
+                if ui.button(format!("Level {}", level)).clicked() {
+                    app.editor.active_doc_mut().fold_state.fold_level(level);
+                    ui.close_menu();
+                }
+            }
+        });
     });
 }
 

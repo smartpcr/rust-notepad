@@ -36,6 +36,10 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         ui.checkbox(&mut app.find_state.case_sensitive, "Aa");
         ui.checkbox(&mut app.find_state.whole_word, "W");
     });
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut app.find_state.use_regex, "Regex");
+        ui.checkbox(&mut app.find_state.extended_mode, "\\n \\t");
+    });
 
     ui.add_space(4.0);
     ui.horizontal(|ui| {
@@ -124,8 +128,77 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         app.find_state.select_match(idx);
     }
 
+    ui.add_space(4.0);
+    ui.separator();
+
+    // Find in Files
+    if ui.button("Find in Files...").clicked() {
+        if let Some(folder) = rfd::FileDialog::new().pick_folder() {
+            let query = app.find_state.query.clone();
+            if !query.is_empty() {
+                let results = rust_notepad::extensibility::project_search(
+                    &folder,
+                    &query,
+                );
+                if let Ok(hits) = results {
+                    app.find_state.file_results = hits
+                        .iter()
+                        .map(|h| {
+                            (
+                                h.file.display().to_string(),
+                                h.line,
+                                h.text.clone(),
+                            )
+                        })
+                        .collect();
+                    app.find_state.show_find_in_files = true;
+                }
+            }
+        }
+    }
+
+    if app.find_state.show_find_in_files && !app.find_state.file_results.is_empty() {
+        ui.add_space(4.0);
+        ui.label(
+            egui::RichText::new(format!(
+                "Files: {} hits",
+                app.find_state.file_results.len()
+            ))
+            .size(11.0)
+            .color(accent),
+        );
+        let mut open_path: Option<String> = None;
+        egui::ScrollArea::vertical()
+            .id_source("find_in_files_results")
+            .max_height(200.0)
+            .show(ui, |ui| {
+                for (path, line, content) in &app.find_state.file_results {
+                    let short_path = if path.len() > 30 {
+                        format!("...{}", &path[path.len() - 27..])
+                    } else {
+                        path.clone()
+                    };
+                    let label = format!("{}:{} {}", short_path, line, content.trim());
+                    let text = egui::RichText::new(&label)
+                        .size(10.0)
+                        .color(dim)
+                        .family(egui::FontFamily::Monospace);
+                    if ui.selectable_label(false, text).clicked() {
+                        open_path = Some(path.clone());
+                    }
+                }
+            });
+        if let Some(path) = open_path {
+            let pb = std::path::PathBuf::from(&path);
+            if pb.exists() {
+                let _ = app.editor.open_document(pb);
+            }
+        }
+    }
+
     ui.add_space(8.0);
     if ui.button("Close").clicked() {
         app.find_state.show_panel = false;
+        app.find_state.show_find_in_files = false;
     }
 }

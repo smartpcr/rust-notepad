@@ -5,13 +5,21 @@ pub struct FindState {
     pub replacement: String,
     pub case_sensitive: bool,
     pub whole_word: bool,
+    pub use_regex: bool,
+    pub extended_mode: bool,
     pub matches: Vec<usize>,
+    /// Lengths of each match (needed for regex where match lengths can vary).
+    pub match_lengths: Vec<usize>,
     pub selected_match: usize,
     pub show_panel: bool,
     /// When set, the editor should move cursor to this byte range and select it.
     pub navigate_to: Option<(usize, usize)>,
     /// When true, the editor TextEdit should request focus (makes cursor visible and blinking).
     pub focus_editor: bool,
+    /// Show Find in Files results.
+    pub show_find_in_files: bool,
+    /// Find in Files results: (file_path, line_number, line_content).
+    pub file_results: Vec<(String, usize, String)>,
 }
 
 impl FindState {
@@ -42,7 +50,12 @@ impl FindState {
 
     fn request_navigation(&mut self) {
         if let Some(&pos) = self.matches.get(self.selected_match) {
-            let end = pos + self.query.len();
+            let match_len = self
+                .match_lengths
+                .get(self.selected_match)
+                .copied()
+                .unwrap_or(self.query.len());
+            let end = pos + match_len;
             self.navigate_to = Some((pos, end));
             self.focus_editor = true;
         }
@@ -79,10 +92,19 @@ pub struct PersistedState {
     /// If true, tabs wrap to multiple lines; if false, tabs scroll horizontally.
     #[serde(default = "default_true")]
     pub tab_wrap: bool,
+    /// Tab stop size (2, 4, or 8 spaces).
+    #[serde(default = "default_tab_size")]
+    pub tab_size: u8,
+    /// Auto-indent on newline.
+    #[serde(default = "default_true")]
+    pub auto_indent: bool,
     /// Paths of open tabs, in order. Empty string for untitled tabs.
     pub open_tabs: Vec<String>,
     /// Index of the active tab.
     pub active_tab: usize,
+    /// Recently opened file paths (most recent first, max 10).
+    #[serde(default)]
+    pub recent_files: Vec<String>,
 }
 
 impl Default for PersistedState {
@@ -97,14 +119,21 @@ impl Default for PersistedState {
             word_wrap: false,
             show_whitespace: false,
             tab_wrap: true,
+            tab_size: 4,
+            auto_indent: true,
             open_tabs: Vec::new(),
             active_tab: 0,
+            recent_files: Vec::new(),
         }
     }
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_tab_size() -> u8 {
+    4
 }
 
 impl PersistedState {
@@ -163,6 +192,12 @@ pub struct ViewSettings {
     pub ui_zoom_pct: u32,
     /// If true, tabs wrap to multiple lines; if false, tabs scroll horizontally.
     pub tab_wrap: bool,
+    /// Tab stop size (2, 4, or 8).
+    pub tab_size: u8,
+    /// Auto-indent new lines to match previous line indentation.
+    pub auto_indent: bool,
+    /// Tracks previous content length for auto-indent detection.
+    pub prev_content_len: usize,
 }
 
 impl Default for ViewSettings {
@@ -177,6 +212,9 @@ impl Default for ViewSettings {
             cursor: CursorPosition::default(),
             ui_zoom_pct: 100,
             tab_wrap: true,
+            tab_size: 4,
+            auto_indent: true,
+            prev_content_len: 0,
         }
     }
 }

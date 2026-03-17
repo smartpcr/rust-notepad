@@ -2,7 +2,7 @@
 
 **Source**: `notepad-plus-plus-clone-prd.md` v1.0
 **Tech Stack**: Rust + egui 0.28 / eframe 0.28 + syntect
-**Last synced**: 2026-03-16
+**Last synced**: 2026-03-16 (Phase 1 implementation)
 
 > Checkboxes sync with implementation status. Checked = implemented and tested.
 
@@ -15,14 +15,14 @@
 | UI Framework | `egui` / `eframe` | 0.28 | In use |
 | Syntax Highlighting | `syntect` (via `egui_extras` + direct) | 5.3 | In use |
 | Text Buffer | `ropey` | — | NOT YET (using String) |
-| Regex Search | `regex` | — | NOT YET |
+| Regex Search | `regex` | 1 | In use |
 | File Dialogs | `rfd` | 0.14 | In use |
 | Serialization | `serde` + `serde_json` | 1.0 | In use |
 | XML | `quick-xml` | 0.36 | In use |
 | Encoding | `encoding_rs` | 0.8 | In use |
 | Diff Engine | `similar` | — | NOT YET (hand-rolled) |
-| File Watching | `notify` | — | NOT YET (polling) |
-| CLI Parsing | `clap` | — | NOT YET |
+| File Watching | `notify` | 6 | In use (with polling fallback) |
+| CLI Parsing | `clap` | 4 | In use |
 | Hashing | `sha2` + `md-5` + `base64` | — | NOT YET |
 | Plugin IPC | JSON-RPC 2.0 over stdio | — | Protocol designed |
 | Benchmarks | `criterion` | — | NOT YET |
@@ -58,19 +58,19 @@ src/
     └── dialogs.rs           — Go to Line, Unsaved Changes confirmation
 ```
 
-### Test Inventory: 68 tests
+### Test Inventory: 77 tests
 
 | Module | Count | Type |
 |--------|-------|------|
-| `core.rs` | 5 | Unit |
-| `editor_state.rs` | 7 | Unit + integration |
+| `core.rs` | 10 | Unit (EOL, encoding, shebang) |
+| `editor_state.rs` | 10 | Unit + integration (regex, extended) |
 | `editor_services.rs` | 7 | Unit |
 | `extensibility.rs` | 12 | Unit |
 | `theme.rs` | 3 | Unit |
 | `shortcuts.rs` | 3 | Unit |
 | `settings.rs` | 5 | Unit |
 | `plugins.rs` | 5 | Unit |
-| `folding.rs` | 16 | Unit |
+| `folding.rs` | 18 | Unit (custom markers, fold levels) |
 | `app/mod.rs` | 7 | Unit |
 | `tests/extensibility_e2e.rs` | 1 | Integration E2E |
 
@@ -90,6 +90,8 @@ src/
 | - [ ] Migrate `Document.content` from `String` to `TextBuffer` | GAP |
 | - [ ] Benchmark: open 100 MB file in < 2 s | GAP |
 
+> **Note**: Ropey migration deferred — requires rewriting all text handling and egui TextEdit integration. egui's TextEdit requires `&mut String`, so migration needs a custom editor widget.
+
 ---
 
 ### 1.2 Encoding & EOL
@@ -101,9 +103,11 @@ src/
 | - [x] Add `encoding_rs` crate | DONE |
 | - [x] Detect encoding: UTF-8 BOM, UTF-16 LE/BE BOM, plain UTF-8, Windows-1252 fallback | DONE |
 | - [x] `decode_bytes()` — handles all encodings transparently on file open | DONE |
-| - [ ] `EolStyle` enum + EOL detection/conversion | GAP |
-| - [ ] UI: encoding + EOL indicators in status bar | GAP |
-| - [ ] Save with different encoding/EOL | GAP |
+| - [x] `EolStyle` enum (LF/CRLF/CR) + EOL detection on load + conversion on save | DONE |
+| - [x] `DetectedEncoding` enum tracking encoding per document | DONE |
+| - [x] UI: encoding + EOL indicators in status bar | DONE |
+| - [x] Save with document's EOL style (LF internally, converted on save) | DONE |
+| - [x] EOL conversion menu (Edit > EOL Conversion > LF/CRLF/CR) | DONE |
 
 ---
 
@@ -119,11 +123,12 @@ src/
 | - [x] Zoom: Ctrl+Scroll, toolbar +/- buttons, font size 6–72pt | DONE |
 | - [x] UI zoom: scales entire UI (menus, toolbar, tabs) via `set_pixels_per_point` | DONE |
 | - [x] Syntax highlighting with font size override in layouter | DONE |
-| - [ ] Multi-caret editing (Alt+Click) | GAP |
-| - [ ] Column/block selection (Alt+Drag) | GAP |
-| - [ ] Overtype mode (Insert key) | GAP |
-| - [ ] Auto-indent on newline | GAP |
-| - [ ] Brace matching/auto-close | GAP |
+| - [ ] Multi-caret editing (Alt+Click) | GAP (requires custom TextEdit widget) |
+| - [ ] Column/block selection (Alt+Drag) | GAP (requires custom TextEdit widget) |
+| - [ ] Overtype mode (Insert key) | GAP (requires custom TextEdit widget) |
+| - [x] Auto-indent on newline (matches previous line indentation) | DONE |
+| - [x] Brace/bracket/paren matching highlight | DONE |
+| - [x] Current line highlight (subtle background) | DONE |
 
 ---
 
@@ -136,8 +141,9 @@ src/
 | - [x] Render `·` for spaces, `→` for tabs as overlays | DONE |
 | - [x] Toggle via View menu | DONE |
 | - [x] Uses galley cursor positions for accurate placement | DONE |
-| - [ ] Tab size setting (2/4/8) | GAP |
-| - [ ] Tab-to-spaces / spaces-to-tabs conversion | GAP |
+| - [x] Tab size setting (2/4/8) in View menu, persisted | DONE |
+| - [x] Tab-to-spaces / spaces-to-tabs conversion (Edit menu) | DONE |
+| - [x] Tab size displayed in status bar | DONE |
 
 ---
 
@@ -154,10 +160,10 @@ src/
 | - [x] Dirty-close confirmation dialog: Save All & Close / Discard All / Cancel | DONE |
 | - [x] Session persistence: save on exit, restore on launch (`~/.codeedit/session.json`) | DONE |
 | - [x] Persists: theme, font size, UI zoom, view toggles, open tab paths, active tab | DONE |
-| - [ ] Recent files list (backend LRU exists, no UI menu) | PARTIAL |
-| - [ ] Replace polling with `notify` file watcher | GAP |
-| - [ ] CLI arg parsing (`clap`) | GAP |
-| - [ ] Drag-and-drop files from OS | GAP |
+| - [x] Recent files list with File > Recent Files submenu (max 10, persisted) | DONE |
+| - [x] `notify` file watcher for external change detection (with polling fallback) | DONE |
+| - [x] CLI arg parsing with `clap` (open files from command line) | DONE |
+| - [x] Drag-and-drop files from OS to open them | DONE |
 
 ---
 
@@ -174,9 +180,9 @@ src/
 | - [x] Global theme: Dark + Light with full custom Visuals | DONE |
 | - [x] Highlight all occurrences of selected whole word (yellow overlay) | DONE |
 | - [x] Light theme highlights visible (boosted alpha for light backgrounds) | DONE |
-| - [ ] Current line highlight | GAP |
+| - [x] Current line highlight (subtle background, dark + light themes) | DONE |
 | - [ ] Style Configurator (per-token color/font) | GAP |
-| - [ ] Shebang detection | GAP |
+| - [x] Shebang detection (`#!/usr/bin/env python3` → Python syntax) | DONE |
 
 ---
 
@@ -195,9 +201,9 @@ src/
 | - [x] Find Next (F3) / Find Previous (Shift+F3) with wrap-around | DONE |
 | - [x] Go to Line dialog (Ctrl+G) with Enter/Escape keyboard support | DONE |
 | - [x] Auto-search on Enter in find field | DONE |
-| - [ ] Regex search mode | GAP |
-| - [ ] Extended search mode (`\n`, `\t`) | GAP |
-| - [ ] Find in Files (backend exists, no UI) | PARTIAL |
+| - [x] Regex search mode (checkbox, uses `regex` crate) | DONE |
+| - [x] Extended search mode (`\n`, `\t`, `\r`, `\\` expansion) | DONE |
+| - [x] Find in Files UI (folder picker, results list, click to open) | DONE |
 
 ---
 
@@ -217,9 +223,9 @@ src/
 | - [x] Collapsed regions show `/* ... N lines ... */` placeholder | DONE |
 | - [x] Fold All / Unfold All (View menu) | DONE |
 | - [x] Syntax-aware dispatch: picks strategy based on file extension | DONE |
-| - [x] 16 unit tests: brace, nested, JSON, XML, indent, toggle, display | DONE |
-| - [ ] Fold Level 1–8 commands | GAP |
-| - [ ] Custom fold markers (`// {{{` / `// }}}`) | GAP |
+| - [x] 18 unit tests: brace, nested, JSON, XML, indent, toggle, display, custom markers, levels | DONE |
+| - [x] Fold Level 1–8 commands (View > Fold Level submenu) | DONE |
+| - [x] Custom fold markers (`// {{{` / `// }}}`, `# {{{` / `# }}}`) | DONE |
 
 ---
 
@@ -303,19 +309,19 @@ src/
 
 | Category | Requirements | Done | Partial | Gap |
 |----------|-------------|------|---------|-----|
-| Core Editing (CE) | 23 | 4 | 2 | 17 |
-| File & Session (FM) | 12 | 8 | 2 | 2 |
-| Syntax Highlighting (SH) | 13 | 6 | 1 | 6 |
-| Search & Replace (SR) | 14 | 8 | 1 | 5 |
-| Code Folding (CF) | 9 | 5 | 0 | 4 |
+| Core Editing (CE) | 23 | 7 | 2 | 14 |
+| File & Session (FM) | 12 | 12 | 0 | 0 |
+| Syntax Highlighting (SH) | 13 | 8 | 0 | 5 |
+| Search & Replace (SR) | 14 | 11 | 0 | 3 |
+| Code Folding (CF) | 9 | 7 | 0 | 2 |
 | MDI / Tabs (MDI) | 11 | 5 | 0 | 6 |
 | Macros (MA) | 9 | 0 | 1 | 8 |
 | Plugins (PL) | 8 | 0 | 2 | 6 |
-| Customization (CU) | 10 | 5 | 1 | 4 |
+| Customization (CU) | 10 | 6 | 0 | 4 |
 | Tools (TU) | 13 | 3 | 0 | 10 |
-| **Totals** | **122** | **44** | **10** | **68** |
+| **Totals** | **122** | **59** | **5** | **58** |
 
-**Progress: 36% done (44/122), 44% including partial (54/122). Up from 6/122 at project start.**
+**Progress: 48% done (59/122), 52% including partial (64/122). Up from 44/122 in previous iteration.**
 
 ---
 
@@ -380,13 +386,13 @@ src/
 | CE-01 | 4 GB file support | GAP | 1.1 |
 | CE-02 | Multi-caret | GAP | 1.3 |
 | CE-03 | Column selection | GAP | 1.3 |
-| CE-04 | Auto-indent | GAP | 1.3 |
+| CE-04 | Auto-indent | **DONE** | 1.3 |
 | CE-05 | Smart indent | GAP | 2.1 |
-| CE-06 | Brace matching/close | GAP | 1.3 |
+| CE-06 | Brace matching/close | **DONE** (matching) | 1.3 |
 | CE-07 | Word wrap | **DONE** | 1.3 |
 | CE-08 | Line numbers | **DONE** | 1.3 |
 | CE-09 | Whitespace viz | **DONE** | 1.4 |
-| CE-10 | EOL conversion | GAP | 1.2 |
+| CE-10 | EOL conversion | **DONE** | 1.2 |
 | CE-11 | Encoding support | **DONE** (decode) | 1.2 |
 | CE-12 | Convert encoding | GAP | 1.2 |
 | CE-13 | Undo/redo | PARTIAL (egui built-in) | 1.1 |
@@ -396,22 +402,22 @@ src/
 | CE-17 | Calltips | GAP | Phase 3 |
 | CE-18 | Zoom | **DONE** | 1.3 |
 | CE-19 | Drag-drop text | GAP | 2.3 |
-| CE-20 | Tab-to-spaces | GAP | 1.4 |
+| CE-20 | Tab-to-spaces | **DONE** | 1.4 |
 | CE-21 | Bookmarks | GAP | 2.4 |
 | CE-22 | Read-only mode | GAP | 2.5 |
 | CE-23 | Overtype mode | GAP | 1.3 |
 | FM-01 | File CRUD | **DONE** | 1.5 |
-| FM-02 | Recent files | PARTIAL | 1.5 |
+| FM-02 | Recent files | **DONE** | 1.5 |
 | FM-03 | External change | **DONE** | 1.5 |
 | FM-04 | Auto-save | GAP | 2.6 |
 | FM-05 | Backup on save | GAP | 2.6 |
 | FM-06 | Session restore | **DONE** | 1.5 |
 | FM-07 | Named sessions | GAP | 2.7 |
 | FM-08 | File explorer | GAP | 2.8 |
-| FM-09 | CLI args | GAP | 1.5 |
+| FM-09 | CLI args | **DONE** | 1.5 |
 | FM-10 | Print | GAP | Phase 4 |
-| FM-11 | Drag files from OS | GAP | 1.5 |
-| FM-12 | Save encoding/EOL | GAP | 1.2 |
+| FM-11 | Drag files from OS | **DONE** | 1.5 |
+| FM-12 | Save encoding/EOL | **DONE** | 1.2 |
 | SH-01 | 50+ languages | **DONE** (80+ mapped) | 1.6 |
 | SH-02 | Priority languages | **DONE** | 1.6 |
 | SH-03 | Auto-detect lang | **DONE** | 1.6 |
@@ -423,14 +429,14 @@ src/
 | SH-09 | Bundled themes | GAP | 2.10 |
 | SH-10 | VSCode theme import | GAP | Phase 3 |
 | SH-11 | Highlight occurrences | **DONE** | 1.6 |
-| SH-12 | Current line highlight | GAP | 1.6 |
+| SH-12 | Current line highlight | **DONE** | 1.6 |
 | SH-13 | Embedded lang | GAP | Phase 3 |
 | SR-01 | Find bar | **DONE** (side panel) | 1.7 |
 | SR-02 | Find & Replace | **DONE** | 1.7 |
-| SR-03 | Regex search | GAP | 1.7 |
+| SR-03 | Regex search | **DONE** | 1.7 |
 | SR-04 | Case/whole-word | **DONE** | 1.7 |
 | SR-05 | Wrap-around | **DONE** (F3/Shift+F3) | 1.7 |
-| SR-06 | Find in Files | PARTIAL | 1.7 |
+| SR-06 | Find in Files | **DONE** | 1.7 |
 | SR-07 | Replace in Files | GAP | 2.11 |
 | SR-08 | Incremental search | GAP | 2.11 |
 | SR-09 | Results panel | **DONE** | 1.7 |
@@ -442,7 +448,7 @@ src/
 | CF-01 | Syntax folding | **DONE** | 1.8 |
 | CF-02 | Indent folding | **DONE** | 1.8 |
 | CF-03 | Fold all/unfold all | **DONE** | 1.8 |
-| CF-04 | Custom fold markers | GAP | 2.12 |
+| CF-04 | Custom fold markers | **DONE** | 1.8 |
 | CF-05 | Function List | GAP | 2.12 |
 | CF-06 | Function List nav | GAP | 2.12 |
 | CF-07 | Function List filter | GAP | 2.12 |
@@ -484,7 +490,7 @@ src/
 | CU-06 | Preferences dialog | GAP | 1.10 |
 | CU-07 | Dark/light sync | GAP | 2.10 |
 | CU-08 | Config export/import | GAP | Phase 3 |
-| CU-09 | Tab size config | GAP | 1.4 |
+| CU-09 | Tab size config | **DONE** | 1.4 |
 | CU-10 | Per-lang settings | GAP | 2.16 |
 | TU-01 | Column editor | GAP | 2.16 |
 | TU-02 | Line operations | GAP | 2.16 |

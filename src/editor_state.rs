@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fs, path::Path, path::PathBuf, time::SystemTime};
 
-use crate::core::{default_syntax_map, AppError, AppResult, Document, SearchQuery, TabId};
+use crate::core::{
+    default_syntax_map, detect_syntax_from_shebang, AppError, AppResult, DetectedEncoding,
+    Document, EolStyle, SearchQuery, TabId,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplaceResult {
@@ -149,8 +152,21 @@ pub fn load_document(
     syntax_map: &HashMap<&'static str, &'static str>,
 ) -> AppResult<Document> {
     let raw = fs::read(&path).map_err(|err| map_io_err(err.kind(), &path))?;
-    let content = decode_bytes(&raw);
+    let (content, encoding) = decode_bytes(&raw);
+    let eol_style = EolStyle::detect(&content);
+    // Normalize to LF for internal editing
+    let content = content.replace("\r\n", "\n").replace('\r', "\n");
+
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("txt");
+    let mut syntax = syntax_map.get(ext).copied().unwrap_or("txt").to_owned();
+
+    // Try shebang detection if extension is generic or missing
+    if syntax == "txt" || ext == "txt" {
+        if let Some(shebang_syntax) = detect_syntax_from_shebang(&content) {
+            syntax = shebang_syntax.to_owned();
+        }
+    }
+
     Ok(Document {
         id: TabId(0),
         title: path
@@ -161,43 +177,44 @@ pub fn load_document(
         path: Some(path.clone()),
         content: content.clone(),
         saved_content: content,
-        syntax: syntax_map.get(ext).copied().unwrap_or("txt").to_owned(),
+        syntax,
         last_modified: fs::metadata(path).ok().and_then(|m| m.modified().ok()),
+        eol_style,
+        encoding,
         externally_changed: false,
         diagnostics: String::new(),
         fold_state: crate::folding::FoldState::default(),
     })
 }
 
-/// Decode raw bytes into a String, handling UTF-8, UTF-16 LE/BE (with BOM),
-/// and falling back to Windows-1252 for other encodings.
-fn decode_bytes(raw: &[u8]) -> String {
+/// Decode raw bytes into a String and detected encoding.
+fn decode_bytes(raw: &[u8]) -> (String, DetectedEncoding) {
     // Check for BOM
     if raw.len() >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF {
-        // UTF-8 BOM — strip it and decode as UTF-8
-        return String::from_utf8_lossy(&raw[3..]).into_owned();
+        return (
+            String::from_utf8_lossy(&raw[3..]).into_owned(),
+            DetectedEncoding::Utf8Bom,
+        );
     }
     if raw.len() >= 2 && raw[0] == 0xFF && raw[1] == 0xFE {
-        // UTF-16 LE BOM
         let (decoded, _, _) = encoding_rs::UTF_16LE.decode(&raw[2..]);
-        return decoded.into_owned();
+        return (decoded.into_owned(), DetectedEncoding::Utf16Le);
     }
     if raw.len() >= 2 && raw[0] == 0xFE && raw[1] == 0xFF {
-        // UTF-16 BE BOM
         let (decoded, _, _) = encoding_rs::UTF_16BE.decode(&raw[2..]);
-        return decoded.into_owned();
+        return (decoded.into_owned(), DetectedEncoding::Utf16Be);
     }
-    // Try UTF-8 first
     if let Ok(s) = std::str::from_utf8(raw) {
-        return s.to_owned();
+        return (s.to_owned(), DetectedEncoding::Utf8);
     }
-    // Fallback: decode as Windows-1252 (common on Windows for non-UTF-8 files)
     let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(raw);
-    decoded.into_owned()
+    (decoded.into_owned(), DetectedEncoding::Windows1252)
 }
 
 pub fn write_document(doc: &mut Document, path: PathBuf) -> AppResult<()> {
-    fs::write(&path, &doc.content).map_err(|err| map_io_err(err.kind(), &path))?;
+    // Convert internal LF to document's EOL style for saving
+    let output = doc.eol_style.apply(&doc.content);
+    fs::write(&path, &output).map_err(|err| map_io_err(err.kind(), &path))?;
     let modified = fs::metadata(&path).ok().and_then(|m| m.modified().ok());
     doc.mark_saved(Some(path), modified);
     Ok(())
@@ -211,6 +228,30 @@ pub fn detect_external_change(doc: &Document, current_mtime: Option<SystemTime>)
         (Some(prev), Some(current)) => current > prev,
         _ => false,
     }
+}
+
+/// Expand extended search escape sequences: \n, \t, \r, \\.
+pub fn expand_extended(query: &str) -> String {
+    let mut out = String::with_capacity(query.len());
+    let mut chars = query.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('r') => out.push('\r'),
+                Some('\\') => out.push('\\'),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 pub fn find_matches(haystack: &str, query: &SearchQuery) -> Vec<usize> {
@@ -242,6 +283,23 @@ pub fn find_matches(haystack: &str, query: &SearchQuery) -> Vec<usize> {
         }
     }
     out
+}
+
+/// Find matches using regex. Returns (positions, match_lengths).
+pub fn find_matches_regex(haystack: &str, pattern: &str, case_sensitive: bool) -> Option<(Vec<usize>, Vec<usize>)> {
+    let pattern = if case_sensitive {
+        pattern.to_string()
+    } else {
+        format!("(?i){}", pattern)
+    };
+    let re = regex::Regex::new(&pattern).ok()?;
+    let mut positions = Vec::new();
+    let mut lengths = Vec::new();
+    for m in re.find_iter(haystack) {
+        positions.push(m.start());
+        lengths.push(m.len());
+    }
+    Some((positions, lengths))
 }
 
 pub fn replace_all(content: &str, query: &SearchQuery, replacement: &str) -> ReplaceResult {
@@ -393,7 +451,24 @@ mod tests {
     }
 
     #[test]
+    fn extended_search_expands_escapes() {
+        assert_eq!(super::expand_extended("hello\\nworld"), "hello\nworld");
+        assert_eq!(super::expand_extended("a\\tb"), "a\tb");
+        assert_eq!(super::expand_extended("a\\\\b"), "a\\b");
+    }
+
+    #[test]
+    fn regex_search_finds_matches() {
+        let result = super::find_matches_regex("foo123bar456", r"\d+", true);
+        assert!(result.is_some());
+        let (positions, lengths) = result.unwrap();
+        assert_eq!(positions, vec![3, 9]);
+        assert_eq!(lengths, vec![3, 3]);
+    }
+
+    #[test]
     fn external_change_detected_only_for_clean_docs() {
+        use crate::core::{DetectedEncoding, EolStyle};
         let doc = Document {
             id: TabId(1),
             title: "a".into(),
@@ -402,6 +477,8 @@ mod tests {
             saved_content: "abc".into(),
             syntax: "txt".into(),
             last_modified: Some(UNIX_EPOCH + Duration::from_secs(5)),
+            eol_style: EolStyle::LF,
+            encoding: DetectedEncoding::Utf8,
             externally_changed: false,
             diagnostics: String::new(),
             fold_state: Default::default(),

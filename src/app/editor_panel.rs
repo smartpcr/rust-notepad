@@ -186,6 +186,9 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 paint_whitespace_markers(ui, &editor_output, content_ref, font_size, ws_color);
             }
 
+            // -- Current line highlight --
+            highlight_current_line(ui, &editor_output, &app.app_theme);
+
             // -- Highlight selected word occurrences --
             let content_ref = if has_folds {
                 &display_content
@@ -193,6 +196,9 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 &app.editor.active_doc().content
             };
             highlight_word_occurrences(ui, &editor_output, content_ref);
+
+            // -- Brace matching --
+            highlight_matching_brace(ui, &editor_output, content_ref, &app.app_theme);
 
             // -- XML tag matching --
             let is_xml_like = matches!(
@@ -236,7 +242,178 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             byte_offset: clamped,
             selection_len,
         };
+
+        // -- Auto-indent on newline --
+        if app.view.auto_indent && !has_folds {
+            let content_len = app.editor.active_doc().content.len();
+            let prev_len = app.view.prev_content_len;
+            // Check if exactly one character was added and it's a newline
+            if content_len > prev_len && clamped > 0 {
+                let content = &app.editor.active_doc().content;
+                if content.as_bytes().get(clamped - 1) == Some(&b'\n') {
+                    // Get indentation of the previous line
+                    let before_newline = &content[..clamped - 1];
+                    let prev_line_start = before_newline.rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let prev_line = &content[prev_line_start..clamped - 1];
+                    let indent: String =
+                        prev_line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+
+                    if !indent.is_empty() {
+                        // Check if there's already indentation after the newline
+                        let after = &content[clamped..];
+                        let existing_indent: String =
+                            after.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+                        if existing_indent.is_empty() {
+                            app.editor
+                                .active_doc_mut()
+                                .content
+                                .insert_str(clamped, &indent);
+                        }
+                    }
+                }
+            }
+            app.view.prev_content_len = app.editor.active_doc().content.len();
+        }
     }
+}
+
+/// Highlight the current line with a subtle background.
+fn highlight_current_line(
+    ui: &egui::Ui,
+    output: &egui::text_edit::TextEditOutput,
+    theme: &rust_notepad::theme::AppTheme,
+) {
+    let cursor_range = match &output.cursor_range {
+        Some(r) => r,
+        None => return,
+    };
+
+    let galley = &output.galley;
+    let text_rect = output.response.rect;
+    let cursor = &cursor_range.primary;
+    let pos = galley.pos_from_cursor(cursor);
+    let row_y = text_rect.top() + pos.min.y;
+    let row_height = pos.max.y - pos.min.y;
+
+    if row_height > 0.0 {
+        let line_rect = egui::Rect::from_min_max(
+            egui::pos2(text_rect.left(), row_y),
+            egui::pos2(text_rect.right(), row_y + row_height),
+        );
+        ui.painter()
+            .rect_filled(line_rect, 0.0, theme.current_line_bg());
+    }
+}
+
+/// Highlight matching brace/bracket/parenthesis at cursor.
+fn highlight_matching_brace(
+    ui: &egui::Ui,
+    output: &egui::text_edit::TextEditOutput,
+    content: &str,
+    theme: &rust_notepad::theme::AppTheme,
+) {
+    let cursor_range = match &output.cursor_range {
+        Some(r) => r,
+        None => return,
+    };
+    let cursor_pos = cursor_range.primary.ccursor.index.min(content.len());
+
+    let at_cursor = if cursor_pos < content.len() {
+        Some(content.as_bytes()[cursor_pos])
+    } else {
+        None
+    };
+    let before_cursor = if cursor_pos > 0 {
+        Some(content.as_bytes()[cursor_pos - 1])
+    } else {
+        None
+    };
+
+    let (brace_pos, is_open) =
+        if matches!(at_cursor, Some(b'{') | Some(b'(') | Some(b'[')) {
+            (cursor_pos, true)
+        } else if matches!(before_cursor, Some(b'}') | Some(b')') | Some(b']')) {
+            (cursor_pos - 1, false)
+        } else if matches!(at_cursor, Some(b'}') | Some(b')') | Some(b']')) {
+            (cursor_pos, false)
+        } else if matches!(before_cursor, Some(b'{') | Some(b'(') | Some(b'[')) {
+            (cursor_pos - 1, true)
+        } else {
+            return;
+        };
+
+    let brace = content.as_bytes()[brace_pos];
+    let (open, close) = match brace {
+        b'{' | b'}' => (b'{', b'}'),
+        b'(' | b')' => (b'(', b')'),
+        b'[' | b']' => (b'[', b']'),
+        _ => return,
+    };
+
+    let match_pos = if is_open {
+        find_matching_close_brace(content, brace_pos, open, close)
+    } else {
+        find_matching_open_brace(content, brace_pos, open, close)
+    };
+
+    if let Some(match_pos) = match_pos {
+        let galley = &output.galley;
+        let text_rect = output.response.rect;
+        let clip = ui.clip_rect();
+        let color = theme.brace_match_bg();
+
+        for &pos in &[brace_pos, match_pos] {
+            let c_start = galley.from_ccursor(egui::text::CCursor::new(pos));
+            let c_end = galley.from_ccursor(egui::text::CCursor::new(pos + 1));
+            let p_start = galley.pos_from_cursor(&c_start);
+            let p_end = galley.pos_from_cursor(&c_end);
+
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(text_rect.left() + p_start.min.x, text_rect.top() + p_start.min.y),
+                egui::pos2(text_rect.left() + p_end.max.x, text_rect.top() + p_end.max.y),
+            );
+
+            if rect.top() < clip.bottom() + 50.0 && rect.bottom() > clip.top() - 50.0 {
+                ui.painter().rect_filled(rect, 2.0, color);
+            }
+        }
+    }
+}
+
+fn find_matching_close_brace(content: &str, start: usize, open: u8, close: u8) -> Option<usize> {
+    let bytes = content.as_bytes();
+    let mut depth = 1i32;
+    let mut i = start + 1;
+    while i < bytes.len() {
+        if bytes[i] == open {
+            depth += 1;
+        } else if bytes[i] == close {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn find_matching_open_brace(content: &str, start: usize, open: u8, close: u8) -> Option<usize> {
+    let bytes = content.as_bytes();
+    let mut depth = 1i32;
+    let mut i = start;
+    while i > 0 {
+        i -= 1;
+        if bytes[i] == close {
+            depth += 1;
+        } else if bytes[i] == open {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
+    }
+    None
 }
 
 /// Paint gutter (line numbers + fold markers) using actual galley row positions.

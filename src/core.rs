@@ -7,6 +7,104 @@ use crate::folding::FoldState;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TabId(pub u64);
 
+// ---------------------------------------------------------------------------
+// EOL style
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EolStyle {
+    LF,
+    CRLF,
+    CR,
+}
+
+impl EolStyle {
+    pub fn label(&self) -> &'static str {
+        match self {
+            EolStyle::LF => "LF",
+            EolStyle::CRLF => "CRLF",
+            EolStyle::CR => "CR",
+        }
+    }
+
+    pub fn sequence(&self) -> &'static str {
+        match self {
+            EolStyle::LF => "\n",
+            EolStyle::CRLF => "\r\n",
+            EolStyle::CR => "\r",
+        }
+    }
+
+    /// Detect predominant EOL style from raw content.
+    pub fn detect(content: &str) -> Self {
+        let crlf = content.matches("\r\n").count();
+        let lf_total = content.matches('\n').count();
+        let cr_total = content.matches('\r').count();
+        let lf = lf_total.saturating_sub(crlf);
+        let cr = cr_total.saturating_sub(crlf);
+
+        if crlf >= lf && crlf >= cr && crlf > 0 {
+            EolStyle::CRLF
+        } else if cr > lf && cr > 0 {
+            EolStyle::CR
+        } else {
+            EolStyle::LF
+        }
+    }
+
+    /// Convert content to use this EOL style.
+    pub fn apply(&self, content: &str) -> String {
+        // First normalize to LF, then convert to target
+        let normalized = content.replace("\r\n", "\n").replace('\r', "\n");
+        match self {
+            EolStyle::LF => normalized,
+            EolStyle::CRLF => normalized.replace('\n', "\r\n"),
+            EolStyle::CR => normalized.replace('\n', "\r"),
+        }
+    }
+}
+
+impl Default for EolStyle {
+    fn default() -> Self {
+        if cfg!(target_os = "windows") {
+            EolStyle::CRLF
+        } else {
+            EolStyle::LF
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Detected encoding
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DetectedEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Windows1252,
+}
+
+impl DetectedEncoding {
+    pub fn label(&self) -> &'static str {
+        match self {
+            DetectedEncoding::Utf8 => "UTF-8",
+            DetectedEncoding::Utf8Bom => "UTF-8 BOM",
+            DetectedEncoding::Utf16Le => "UTF-16 LE",
+            DetectedEncoding::Utf16Be => "UTF-16 BE",
+            DetectedEncoding::Windows1252 => "Windows-1252",
+        }
+    }
+}
+
+impl Default for DetectedEncoding {
+    fn default() -> Self {
+        DetectedEncoding::Utf8
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Severity {
     Info,
@@ -37,6 +135,12 @@ pub struct Document {
     pub saved_content: String,
     pub syntax: String,
     pub last_modified: Option<SystemTime>,
+    /// The EOL style detected on load (used when saving).
+    #[serde(default)]
+    pub eol_style: EolStyle,
+    /// The encoding detected on load.
+    #[serde(default)]
+    pub encoding: DetectedEncoding,
     /// Transient: true when the file was changed on disk.
     #[serde(skip, default)]
     pub externally_changed: bool,
@@ -58,6 +162,8 @@ impl Document {
             saved_content: String::new(),
             syntax: "txt".to_owned(),
             last_modified: None,
+            eol_style: EolStyle::default(),
+            encoding: DetectedEncoding::default(),
             externally_changed: false,
             diagnostics: String::new(),
             fold_state: FoldState::default(),
@@ -182,6 +288,32 @@ impl FakeClock {
 impl Clock for FakeClock {
     fn now(&self) -> SystemTime {
         *self.now.lock().expect("fake clock poisoned")
+    }
+}
+
+/// Detect syntax from a shebang line (e.g. `#!/usr/bin/env python3`).
+pub fn detect_syntax_from_shebang(content: &str) -> Option<&'static str> {
+    let first_line = content.lines().next()?;
+    if !first_line.starts_with("#!") {
+        return None;
+    }
+    let shebang = first_line.to_lowercase();
+    if shebang.contains("python") {
+        Some("py")
+    } else if shebang.contains("ruby") {
+        Some("rb")
+    } else if shebang.contains("node") || shebang.contains("deno") {
+        Some("js")
+    } else if shebang.contains("bash") || shebang.contains("/sh") || shebang.contains("/zsh") {
+        Some("sh")
+    } else if shebang.contains("perl") {
+        Some("pl")
+    } else if shebang.contains("lua") {
+        Some("lua")
+    } else if shebang.contains("php") {
+        Some("php")
+    } else {
+        None
     }
 }
 
@@ -317,7 +449,10 @@ pub fn default_syntax_map() -> HashMap<&'static str, &'static str> {
 mod tests {
     use std::time::{Duration, UNIX_EPOCH};
 
-    use super::{default_syntax_map, Document, FakeClock, SessionState, TabId};
+    use super::{
+        default_syntax_map, detect_syntax_from_shebang, Document, EolStyle, FakeClock,
+        SessionState, TabId,
+    };
     use crate::core::Clock;
 
     #[test]
@@ -369,5 +504,37 @@ mod tests {
         assert_eq!(syntax.get("csproj"), Some(&"xml"));
         assert_eq!(syntax.get("csv"), Some(&"txt"));   // CSV → plain text
         assert_eq!(syntax.get("ts"), Some(&"js"));     // TypeScript → JS fallback
+    }
+
+    #[test]
+    fn eol_detect_lf() {
+        assert_eq!(EolStyle::detect("hello\nworld\n"), EolStyle::LF);
+    }
+
+    #[test]
+    fn eol_detect_crlf() {
+        assert_eq!(EolStyle::detect("hello\r\nworld\r\n"), EolStyle::CRLF);
+    }
+
+    #[test]
+    fn eol_detect_cr() {
+        assert_eq!(EolStyle::detect("hello\rworld\r"), EolStyle::CR);
+    }
+
+    #[test]
+    fn eol_apply_converts() {
+        let lf = "a\nb\nc";
+        assert_eq!(EolStyle::CRLF.apply(lf), "a\r\nb\r\nc");
+        let crlf = "a\r\nb\r\nc";
+        assert_eq!(EolStyle::LF.apply(crlf), "a\nb\nc");
+    }
+
+    #[test]
+    fn shebang_detection() {
+        assert_eq!(detect_syntax_from_shebang("#!/usr/bin/env python3\n"), Some("py"));
+        assert_eq!(detect_syntax_from_shebang("#!/bin/bash\n"), Some("sh"));
+        assert_eq!(detect_syntax_from_shebang("#!/usr/bin/node\n"), Some("js"));
+        assert_eq!(detect_syntax_from_shebang("#!/usr/bin/ruby\n"), Some("rb"));
+        assert_eq!(detect_syntax_from_shebang("no shebang\n"), None);
     }
 }

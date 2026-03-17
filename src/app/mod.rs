@@ -6,6 +6,8 @@ mod editor_panel;
 mod status_bar;
 mod dialogs;
 
+use std::path::PathBuf;
+use std::sync::mpsc;
 use std::time::{Duration, SystemTime};
 
 use eframe::egui;
@@ -40,10 +42,21 @@ pub struct RustNotepadApp {
     pub(crate) plugins: Vec<Box<dyn EditorPlugin>>,
     pub(crate) last_scan: SystemTime,
     pub(crate) view: ViewSettings,
+    /// Recently opened file paths (most recent first).
+    pub(crate) recent_files: Vec<String>,
+    /// File watcher event receiver (from notify).
+    pub(crate) watcher_rx: Option<mpsc::Receiver<notify::Result<notify::Event>>>,
+    /// File watcher instance (kept alive).
+    #[allow(dead_code)]
+    pub(crate) watcher: Option<notify::RecommendedWatcher>,
 }
 
 impl RustNotepadApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        Self::new_with_files(cc, Vec::new())
+    }
+
+    pub fn new_with_files(cc: &eframe::CreationContext<'_>, initial_files: Vec<PathBuf>) -> Self {
         // Load persisted session
         let persisted = PersistedState::load();
 
@@ -63,6 +76,8 @@ impl RustNotepadApp {
             font_size: persisted.font_size,
             ui_zoom_pct: persisted.ui_zoom_pct,
             tab_wrap: persisted.tab_wrap,
+            tab_size: persisted.tab_size,
+            auto_indent: persisted.auto_indent,
             ..Default::default()
         };
 
@@ -81,15 +96,30 @@ impl RustNotepadApp {
                 }
             }
         }
+
+        // Open files from CLI args
+        for path in &initial_files {
+            if path.exists() {
+                if let Ok(()) = editor.open_document(path.clone()) {
+                    restored_any = true;
+                }
+            }
+        }
+
         if restored_any {
             // Remove the default "Untitled 1" tab that EditorState creates
             if editor.docs.len() > 1 && editor.docs[0].path.is_none() && !editor.docs[0].is_dirty()
             {
                 editor.docs.remove(0);
             }
-            // Restore active tab index
-            editor.current_tab = persisted.active_tab.min(editor.docs.len().saturating_sub(1));
+            // Restore active tab index (only if no CLI files were opened)
+            if initial_files.is_empty() {
+                editor.current_tab = persisted.active_tab.min(editor.docs.len().saturating_sub(1));
+            }
         }
+
+        // Set up file watcher
+        let (watcher, watcher_rx) = Self::create_watcher();
 
         Self {
             editor,
@@ -100,6 +130,21 @@ impl RustNotepadApp {
             plugins: plugins::default_plugins(),
             last_scan: SystemTime::now(),
             view,
+            recent_files: persisted.recent_files,
+            watcher_rx,
+            watcher,
+        }
+    }
+
+    fn create_watcher() -> (Option<notify::RecommendedWatcher>, Option<mpsc::Receiver<notify::Result<notify::Event>>>) {
+        use notify::Watcher;
+        let (tx, rx) = mpsc::channel();
+        match notify::RecommendedWatcher::new(
+            move |res| { let _ = tx.send(res); },
+            notify::Config::default(),
+        ) {
+            Ok(w) => (Some(w), Some(rx)),
+            Err(_) => (None, None), // Fall back to polling
         }
     }
 
@@ -127,10 +172,23 @@ impl RustNotepadApp {
             word_wrap: self.view.word_wrap,
             show_whitespace: self.view.show_whitespace,
             tab_wrap: self.view.tab_wrap,
+            tab_size: self.view.tab_size,
+            auto_indent: self.view.auto_indent,
             open_tabs,
             active_tab: self.editor.current_tab,
+            recent_files: self.recent_files.clone(),
         };
         state.save();
+    }
+
+    /// Add a file path to the recent files list.
+    pub(crate) fn add_to_recent(&mut self, path: &std::path::Path) {
+        let path_str = path.display().to_string();
+        self.recent_files.retain(|p| *p != path_str);
+        self.recent_files.insert(0, path_str);
+        if self.recent_files.len() > 10 {
+            self.recent_files.truncate(10);
+        }
     }
 
     // -- Close with confirmation -------------------------------------------
@@ -228,6 +286,8 @@ impl RustNotepadApp {
         let paths = rfd::FileDialog::new().pick_files();
         if let Some(paths) = paths {
             for path in paths {
+                self.add_to_recent(&path);
+                self.watch_file(&path);
                 if let Err(e) = self.editor.open_document(path) {
                     self.editor.active_doc_mut().diagnostics = format!("Open failed: {:?}", e);
                 }
@@ -238,7 +298,11 @@ impl RustNotepadApp {
     pub(crate) fn save_active(&mut self) {
         match self.editor.save_active() {
             Ok(true) => self.save_active_as(), // needs path
-            Ok(false) => {}
+            Ok(false) => {
+                if let Some(path) = self.editor.active_doc().path.clone() {
+                    self.add_to_recent(&path);
+                }
+            }
             Err(e) => {
                 self.editor.active_doc_mut().diagnostics = format!("Save failed: {:?}", e);
             }
@@ -247,9 +311,18 @@ impl RustNotepadApp {
 
     pub(crate) fn save_active_as(&mut self) {
         if let Some(path) = rfd::FileDialog::new().save_file() {
+            self.add_to_recent(&path);
+            self.watch_file(&path);
             if let Err(e) = self.editor.save_active_as(path) {
                 self.editor.active_doc_mut().diagnostics = format!("Save failed: {:?}", e);
             }
+        }
+    }
+
+    fn watch_file(&mut self, path: &std::path::Path) {
+        use notify::Watcher;
+        if let Some(watcher) = &mut self.watcher {
+            let _ = watcher.watch(path, notify::RecursiveMode::NonRecursive);
         }
     }
 
@@ -275,12 +348,34 @@ impl RustNotepadApp {
     // -- External change detection (throttled) -------------------------------
 
     fn scan_external_changes(&mut self) {
+        // Check notify watcher events first
+        if let Some(rx) = &self.watcher_rx {
+            let mut changed_paths: Vec<PathBuf> = Vec::new();
+            while let Ok(Ok(event)) = rx.try_recv() {
+                if matches!(
+                    event.kind,
+                    notify::EventKind::Modify(_) | notify::EventKind::Create(_)
+                ) {
+                    changed_paths.extend(event.paths);
+                }
+            }
+            // Mark documents as externally changed
+            for doc in &mut self.editor.docs {
+                if let Some(doc_path) = &doc.path {
+                    if changed_paths.iter().any(|p| p == doc_path) && !doc.is_dirty() {
+                        doc.externally_changed = true;
+                    }
+                }
+            }
+        }
+
+        // Fall back to polling (throttled) if watcher missed anything
         if self
             .last_scan
             .elapsed()
             .unwrap_or(Duration::from_secs(0))
             .as_secs_f32()
-            < 1.0
+            < 2.0
         {
             return;
         }
@@ -292,12 +387,42 @@ impl RustNotepadApp {
 
     pub(crate) fn refresh_matches(&mut self) {
         let haystack = &self.editor.active_doc().content;
-        let query = SearchQuery {
-            query: self.find_state.query.clone(),
-            case_sensitive: self.find_state.case_sensitive,
-            whole_word: self.find_state.whole_word,
+
+        // Expand extended search escapes if enabled
+        let query_str = if self.find_state.extended_mode {
+            rust_notepad::editor_state::expand_extended(&self.find_state.query)
+        } else {
+            self.find_state.query.clone()
         };
-        self.find_state.matches = rust_notepad::editor_state::find_matches(haystack, &query);
+
+        if self.find_state.use_regex {
+            // Regex search
+            if let Some((positions, lengths)) = rust_notepad::editor_state::find_matches_regex(
+                haystack,
+                &query_str,
+                self.find_state.case_sensitive,
+            ) {
+                self.find_state.matches = positions;
+                self.find_state.match_lengths = lengths;
+            } else {
+                self.find_state.matches.clear();
+                self.find_state.match_lengths.clear();
+            }
+        } else {
+            // Standard search
+            let query = SearchQuery {
+                query: query_str,
+                case_sensitive: self.find_state.case_sensitive,
+                whole_word: self.find_state.whole_word,
+            };
+            self.find_state.matches = rust_notepad::editor_state::find_matches(haystack, &query);
+            self.find_state.match_lengths = self
+                .find_state
+                .matches
+                .iter()
+                .map(|_| self.find_state.query.len())
+                .collect();
+        }
     }
 
     pub(crate) fn replace_current(&mut self) {
@@ -310,12 +435,17 @@ impl RustNotepadApp {
             .selected_match
             .min(self.find_state.matches.len() - 1);
         let at = self.find_state.matches[idx];
-        let query_len = self.find_state.query.len();
+        let match_len = self
+            .find_state
+            .match_lengths
+            .get(idx)
+            .copied()
+            .unwrap_or(self.find_state.query.len());
         let replacement = self.find_state.replacement.clone();
         self.editor
             .active_doc_mut()
             .content
-            .replace_range(at..at + query_len, &replacement);
+            .replace_range(at..at + match_len, &replacement);
         self.refresh_matches();
     }
 
@@ -323,15 +453,41 @@ impl RustNotepadApp {
         if self.find_state.query.is_empty() {
             return;
         }
-        let query = SearchQuery {
-            query: self.find_state.query.clone(),
-            case_sensitive: self.find_state.case_sensitive,
-            whole_word: self.find_state.whole_word,
+        let query_str = if self.find_state.extended_mode {
+            rust_notepad::editor_state::expand_extended(&self.find_state.query)
+        } else {
+            self.find_state.query.clone()
         };
-        let replacement = &self.find_state.replacement;
-        let result =
-            rust_notepad::editor_state::replace_all(&self.editor.active_doc().content, &query, replacement);
-        self.editor.active_doc_mut().content = result.new_content;
+        let replacement = if self.find_state.extended_mode {
+            rust_notepad::editor_state::expand_extended(&self.find_state.replacement)
+        } else {
+            self.find_state.replacement.clone()
+        };
+
+        if self.find_state.use_regex {
+            // For regex replace, use the regex crate directly
+            let pattern = if self.find_state.case_sensitive {
+                query_str.clone()
+            } else {
+                format!("(?i){}", query_str)
+            };
+            if let Ok(re) = regex::Regex::new(&pattern) {
+                let new_content = re.replace_all(&self.editor.active_doc().content, replacement.as_str()).to_string();
+                self.editor.active_doc_mut().content = new_content;
+            }
+        } else {
+            let query = SearchQuery {
+                query: query_str,
+                case_sensitive: self.find_state.case_sensitive,
+                whole_word: self.find_state.whole_word,
+            };
+            let result = rust_notepad::editor_state::replace_all(
+                &self.editor.active_doc().content,
+                &query,
+                &replacement,
+            );
+            self.editor.active_doc_mut().content = result.new_content;
+        }
         self.refresh_matches();
     }
 
@@ -402,6 +558,22 @@ impl eframe::App for RustNotepadApp {
         // 0. Apply theme + UI zoom every frame (eframe may reset after init)
         self.app_theme.apply(ctx);
         ctx.set_pixels_per_point(self.view.pixels_per_point());
+
+        // 0.5 Handle drag-and-drop files
+        let dropped_files: Vec<PathBuf> = ctx.input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .filter_map(|f| f.path.clone())
+                .collect()
+        });
+        for path in dropped_files {
+            self.add_to_recent(&path);
+            self.watch_file(&path);
+            if let Err(e) = self.editor.open_document(path) {
+                self.editor.active_doc_mut().diagnostics = format!("Open failed: {:?}", e);
+            }
+        }
 
         // 1. Background tasks
         self.scan_external_changes();
@@ -476,6 +648,9 @@ mod tests {
             plugins: vec![],
             last_scan: SystemTime::now(),
             view: ViewSettings::default(),
+            recent_files: Vec::new(),
+            watcher_rx: None,
+            watcher: None,
         }
     }
 

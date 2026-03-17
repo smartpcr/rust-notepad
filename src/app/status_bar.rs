@@ -66,8 +66,11 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     let lines = doc.line_count();
     let chars = doc.char_count();
     let dirty = doc.is_dirty();
+    let eol_label = doc.eol_style.label().to_owned();
+    let encoding_label = doc.encoding.label().to_owned();
     let font_size = app.view.font_size;
     let cursor = app.view.cursor;
+    let tab_size = app.view.tab_size;
     let accent = app.app_theme.accent();
     let dim = app.app_theme.text_dim();
 
@@ -146,6 +149,18 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                     }
                 }
             });
+        status_sep(ui);
+
+        // Encoding
+        status_item(ui, &encoding_label, dim);
+        status_sep(ui);
+
+        // EOL
+        status_item(ui, &eol_label, dim);
+        status_sep(ui);
+
+        // Tab size
+        status_item(ui, &format!("Tab: {}", tab_size), dim);
         status_sep(ui);
 
         // Modified state

@@ -71,6 +71,33 @@ impl FoldState {
         self.collapsed.clear();
     }
 
+    /// Fold to a specific level (1-8). Level 1 = only top-level folds collapsed.
+    /// Level N = collapse all regions whose nesting depth <= N.
+    pub fn fold_level(&mut self, level: usize) {
+        self.collapsed.clear();
+        // Compute nesting depth for each region
+        let mut sorted = self.regions.clone();
+        sorted.sort_by_key(|r| r.start_line);
+
+        for region in &sorted {
+            let depth = self.nesting_depth(region);
+            if depth < level {
+                self.collapsed.insert(region.start_line);
+            }
+        }
+    }
+
+    /// Compute nesting depth of a region (0 = top level).
+    fn nesting_depth(&self, target: &FoldRegion) -> usize {
+        self.regions
+            .iter()
+            .filter(|r| {
+                r.start_line < target.start_line
+                    && r.end_line > target.end_line
+            })
+            .count()
+    }
+
     /// Get the set of lines that should be hidden (inside collapsed folds).
     /// Returns a set of 0-based line numbers to hide.
     pub fn hidden_lines(&self) -> HashSet<usize> {
@@ -136,7 +163,10 @@ impl FoldState {
 
 /// Pick the right fold strategy based on file syntax.
 fn compute_folds(content: &str, syntax: &str) -> Vec<FoldRegion> {
-    match syntax {
+    // Always include custom fold markers (// {{{ / // }}})
+    let mut regions = compute_custom_marker_folds(content);
+
+    let syntax_regions = match syntax {
         // XML/HTML family — fold on matching tags
         "xml" | "html" | "htm" | "svg" | "xaml" | "xsl" | "xslt" | "xsd" | "jsp" | "vue"
         | "svelte" | "rss" | "opml" => compute_xml_folds(content),
@@ -146,7 +176,38 @@ fn compute_folds(content: &str, syntax: &str) -> Vec<FoldRegion> {
         "py" | "yaml" | "yml" | "ini" | "cfg" | "conf" => compute_indent_folds(content),
         // Everything else — brace-based (C-family, Rust, Go, Java, C#, PS, etc.)
         _ => compute_brace_folds(content),
+    };
+
+    regions.extend(syntax_regions);
+    regions.sort_by_key(|r| r.start_line);
+    // Deduplicate by start_line
+    regions.dedup_by_key(|r| r.start_line);
+    regions
+}
+
+/// Compute fold regions from custom markers: `// {{{` and `// }}}`.
+/// Also supports `# {{{` / `# }}}` for shell/python and `-- {{{` / `-- }}}` for SQL/Lua.
+fn compute_custom_marker_folds(content: &str) -> Vec<FoldRegion> {
+    let mut regions = Vec::new();
+    let mut stack: Vec<usize> = Vec::new();
+
+    for (line_idx, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.contains("{{{") {
+            stack.push(line_idx);
+        } else if trimmed.contains("}}}") {
+            if let Some(start) = stack.pop() {
+                if line_idx > start + 1 {
+                    regions.push(FoldRegion {
+                        start_line: start,
+                        end_line: line_idx,
+                    });
+                }
+            }
+        }
     }
+
+    regions
 }
 
 /// Compute fold regions based on brace matching `{` `}`.
@@ -592,6 +653,28 @@ mod tests {
         let regions = compute_indent_folds(content);
         assert!(!regions.is_empty());
         assert!(regions.iter().any(|r| r.start_line == 0));
+    }
+
+    // -- Custom marker tests --
+
+    #[test]
+    fn custom_marker_folds() {
+        let content = "// {{{ Section\nline1\nline2\n// }}}\n";
+        let regions = compute_custom_marker_folds(content);
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].start_line, 0);
+        assert_eq!(regions[0].end_line, 3);
+    }
+
+    #[test]
+    fn fold_level_collapses_top_level() {
+        // Nested: outer { inner { ... } }
+        let content = "outer {\n  inner {\n    x\n  }\n}\n";
+        let mut state = FoldState::default();
+        state.update_regions(content, "rs");
+        state.fold_level(1); // collapse only top-level
+        assert!(state.is_collapsed(0)); // outer is top-level (depth 0 < 1)
+        assert!(!state.is_collapsed(1)); // inner is depth 1, not < 1
     }
 
     // -- Dispatch test --
