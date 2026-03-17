@@ -150,7 +150,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         );
         let mut open_path: Option<String> = None;
         egui::ScrollArea::vertical()
-            .id_source("find_in_files_results")
+            .id_salt("find_in_files_results")
             .max_height(200.0)
             .show(ui, |ui| {
                 for (path, line, content) in &app.find_state.file_results {

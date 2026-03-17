@@ -73,7 +73,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         )
         .fill(bg)
         .stroke(stroke)
-        .rounding(egui::CornerRadius {
+        .corner_radius(egui::CornerRadius {
             nw: 6,
             ne: 6,
             sw: 0,
@@ -97,21 +97,21 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         response.context_menu(|ui: &mut egui::Ui| {
             if ui.button("Close").clicked() {
                 actions.push(TabAction::Close(i));
-                ui.close_menu();
+                ui.close();
             }
             if ui.button("Close Others").clicked() {
                 actions.push(TabAction::CloseOthers(i));
-                ui.close_menu();
+                ui.close();
             }
             if ui.button("Close All").clicked() {
                 actions.push(TabAction::CloseAll);
-                ui.close_menu();
+                ui.close();
             }
             ui.separator();
             if let Some(path) = path_str {
                 if ui.button(format!("Copy Path: {}", path)).clicked() {
                     actions.push(TabAction::CopyPath(path.clone()));
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });

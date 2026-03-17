@@ -5,7 +5,7 @@ use rust_notepad::shortcuts::{menu_item, Shortcuts};
 use super::RustNotepadApp;
 
 pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui, ctx: &egui::Context) {
-    egui::menu::bar(ui, |ui| {
+    egui::MenuBar::new().ui(ui, |ui| {
         render_file_menu(app, ui);
         render_edit_menu(app, ui);
         render_search_menu(app, ui);
@@ -21,24 +21,24 @@ fn render_file_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     ui.menu_button("File", |ui| {
         if menu_item(ui, "New", &Shortcuts::new_tab()) {
             app.editor.new_tab();
-            ui.close_menu();
+            ui.close();
         }
         if menu_item(ui, "Open...", &Shortcuts::open()) {
             app.open_file();
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         if menu_item(ui, "Save", &Shortcuts::save()) {
             app.save_active();
-            ui.close_menu();
+            ui.close();
         }
         if menu_item(ui, "Save As...", &Shortcuts::save_as()) {
             app.save_active_as();
-            ui.close_menu();
+            ui.close();
         }
         if ui.button("Save All").clicked() {
             app.editor.save_all();
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         // Recent Files
@@ -59,13 +59,13 @@ fn render_file_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                                     format!("Open failed: {:?}", e);
                             }
                         }
-                        ui.close_menu();
+                        ui.close();
                     }
                 }
                 ui.separator();
                 if ui.button("Clear Recent Files").clicked() {
                     app.recent_files.clear();
-                    ui.close_menu();
+                    ui.close();
                 }
             });
             ui.separator();
@@ -73,11 +73,11 @@ fn render_file_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         if menu_item(ui, "Close", &Shortcuts::close_tab()) {
             let idx = app.editor.current_tab;
             app.request_close_tab(idx);
-            ui.close_menu();
+            ui.close();
         }
         if ui.button("Close All").clicked() {
             app.request_close_all();
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -92,18 +92,18 @@ fn render_edit_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 .map(|l| l.trim_end())
                 .collect::<Vec<_>>()
                 .join("\n");
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         if ui.button("Convert to UPPERCASE").clicked() {
             let doc = app.editor.active_doc_mut();
             doc.content = doc.content.to_uppercase();
-            ui.close_menu();
+            ui.close();
         }
         if ui.button("Convert to lowercase").clicked() {
             let doc = app.editor.active_doc_mut();
             doc.content = doc.content.to_lowercase();
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
 
@@ -118,7 +118,7 @@ fn render_edit_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 );
                 if ui.button(label).clicked() {
                     app.editor.active_doc_mut().eol_style = *eol;
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });
@@ -131,13 +131,13 @@ fn render_edit_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             let spaces: String = " ".repeat(tab_size);
             let doc = app.editor.active_doc_mut();
             doc.content = doc.content.replace('\t', &spaces);
-            ui.close_menu();
+            ui.close();
         }
         if ui.button("Convert Spaces to Tabs").clicked() {
             let spaces: String = " ".repeat(tab_size);
             let doc = app.editor.active_doc_mut();
             doc.content = doc.content.replace(&spaces, "\t");
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -146,26 +146,26 @@ fn render_search_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     ui.menu_button("Search", |ui| {
         if menu_item(ui, "Find...", &Shortcuts::find()) {
             app.find_state.show_panel = true;
-            ui.close_menu();
+            ui.close();
         }
         if menu_item(ui, "Replace...", &Shortcuts::replace()) {
             app.find_state.show_panel = true;
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         if ui.button("Find Next          F3").clicked() {
             app.find_state.find_next();
-            ui.close_menu();
+            ui.close();
         }
         if ui.button("Find Previous  Shift+F3").clicked() {
             app.find_state.find_prev();
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         if menu_item(ui, "Go to Line...", &Shortcuts::go_to_line()) {
             app.go_to_line.open = true;
             app.go_to_line.input.clear();
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -195,7 +195,7 @@ fn render_view_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
                 );
                 if ui.button(label).clicked() {
                     app.view.tab_size = *size;
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });
@@ -228,18 +228,18 @@ fn render_view_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         ui.separator();
         if ui.button("Fold All").clicked() {
             app.editor.active_doc_mut().fold_state.fold_all();
-            ui.close_menu();
+            ui.close();
         }
         if ui.button("Unfold All").clicked() {
             app.editor.active_doc_mut().fold_state.unfold_all();
-            ui.close_menu();
+            ui.close();
         }
         // Fold levels
         ui.menu_button("Fold Level", |ui| {
             for level in 1..=8 {
                 if ui.button(format!("Level {}", level)).clicked() {
                     app.editor.active_doc_mut().fold_state.fold_level(level);
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });
@@ -252,7 +252,7 @@ fn render_settings_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui, ctx: &egui:
         if ui.button(current_label).clicked() {
             app.app_theme = app.app_theme.toggle();
             app.app_theme.apply(ctx);
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -261,7 +261,7 @@ fn render_tools_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
     ui.menu_button("Tools", |ui| {
         if ui.button("Run Validation Plugins").clicked() {
             app.run_plugins();
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -282,7 +282,7 @@ fn render_window_menu(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             };
             if ui.selectable_label(i == current, label).clicked() {
                 app.editor.current_tab = i;
-                ui.close_menu();
+                ui.close();
             }
         }
     });

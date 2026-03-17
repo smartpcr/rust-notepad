@@ -129,7 +129,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
             .map(|(_, name)| *name)
             .unwrap_or(&syntax);
 
-        egui::ComboBox::from_id_source("syntax_selector")
+        egui::ComboBox::from_id_salt("syntax_selector")
             .selected_text(egui::RichText::new(display_name).size(11.0).color(accent))
             .width(120.0)
             .show_ui(ui, |ui: &mut egui::Ui| {
