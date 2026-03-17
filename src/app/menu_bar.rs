@@ -1,6 +1,6 @@
+use crate::core::EolStyle;
+use crate::shortcuts::{menu_item, Shortcuts};
 use eframe::egui;
-use rust_notepad::core::EolStyle;
-use rust_notepad::shortcuts::{menu_item, Shortcuts};
 
 use super::RustNotepadApp;
 

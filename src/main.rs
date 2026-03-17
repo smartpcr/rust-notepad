@@ -1,10 +1,8 @@
-mod app;
-
 use std::path::PathBuf;
 
-use app::RustNotepadApp;
 use clap::Parser;
 use log::error;
+use rust_notepad::app::RustNotepadApp;
 
 /// TextEdit — A Notepad++ clone in Rust
 #[derive(Parser)]

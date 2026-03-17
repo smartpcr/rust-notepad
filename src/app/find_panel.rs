@@ -129,7 +129,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
         if let Some(folder) = rfd::FileDialog::new().pick_folder() {
             let query = app.find_state.query.clone();
             if !query.is_empty() {
-                let results = rust_notepad::extensibility::project_search(&folder, &query);
+                let results = crate::extensibility::project_search(&folder, &query);
                 if let Ok(hits) = results {
                     app.find_state.file_results = hits
                         .iter()

@@ -10,8 +10,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime};
 
-use eframe::egui;
-use rust_notepad::{
+use crate::{
     core::SearchQuery,
     editor_state::EditorState,
     plugins::{self, EditorPlugin},
@@ -19,6 +18,7 @@ use rust_notepad::{
     shortcuts::Shortcuts,
     theme::AppTheme,
 };
+use eframe::egui;
 
 // ---------------------------------------------------------------------------
 // Main application struct
@@ -113,6 +113,8 @@ impl RustNotepadApp {
                 editor.current_tab = persisted
                     .active_tab
                     .min(editor.docs.len().saturating_sub(1));
+            } else {
+                editor.current_tab = editor.docs.len().saturating_sub(1);
             }
         }
 
@@ -253,10 +255,7 @@ impl RustNotepadApp {
         for &idx in &self.close_confirm.pending_tabs {
             if idx < self.editor.docs.len() && self.editor.docs[idx].is_dirty() {
                 if let Some(path) = self.editor.docs[idx].path.clone() {
-                    let _ = rust_notepad::editor_state::write_document(
-                        &mut self.editor.docs[idx],
-                        path,
-                    );
+                    let _ = crate::editor_state::write_document(&mut self.editor.docs[idx], path);
                 }
                 // If no path, skip (can't auto-save untitled)
             }
@@ -393,14 +392,14 @@ impl RustNotepadApp {
 
         // Expand extended search escapes if enabled
         let query_str = if self.find_state.extended_mode {
-            rust_notepad::editor_state::expand_extended(&self.find_state.query)
+            crate::editor_state::expand_extended(&self.find_state.query)
         } else {
             self.find_state.query.clone()
         };
 
         if self.find_state.use_regex {
             // Regex search
-            if let Some((positions, lengths)) = rust_notepad::editor_state::find_matches_regex(
+            if let Some((positions, lengths)) = crate::editor_state::find_matches_regex(
                 haystack,
                 &query_str,
                 self.find_state.case_sensitive,
@@ -418,7 +417,7 @@ impl RustNotepadApp {
                 case_sensitive: self.find_state.case_sensitive,
                 whole_word: self.find_state.whole_word,
             };
-            self.find_state.matches = rust_notepad::editor_state::find_matches(haystack, &query);
+            self.find_state.matches = crate::editor_state::find_matches(haystack, &query);
             self.find_state.match_lengths = self
                 .find_state
                 .matches
@@ -457,12 +456,12 @@ impl RustNotepadApp {
             return;
         }
         let query_str = if self.find_state.extended_mode {
-            rust_notepad::editor_state::expand_extended(&self.find_state.query)
+            crate::editor_state::expand_extended(&self.find_state.query)
         } else {
             self.find_state.query.clone()
         };
         let replacement = if self.find_state.extended_mode {
-            rust_notepad::editor_state::expand_extended(&self.find_state.replacement)
+            crate::editor_state::expand_extended(&self.find_state.replacement)
         } else {
             self.find_state.replacement.clone()
         };
@@ -486,7 +485,7 @@ impl RustNotepadApp {
                 case_sensitive: self.find_state.case_sensitive,
                 whole_word: self.find_state.whole_word,
             };
-            let result = rust_notepad::editor_state::replace_all(
+            let result = crate::editor_state::replace_all(
                 &self.editor.active_doc().content,
                 &query,
                 &replacement,
@@ -630,7 +629,7 @@ impl eframe::App for RustNotepadApp {
         dialogs::render_close_confirm(self, ctx);
     }
 
-    fn on_exit(&mut self) {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.save_session();
     }
 }

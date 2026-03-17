@@ -1,6 +1,6 @@
+use crate::settings::CursorPosition;
 use eframe::egui::{self, text::LayoutJob, Align2, FontId, TextEdit, Vec2};
 use egui_extras::syntax_highlighting;
-use rust_notepad::settings::CursorPosition;
 
 use super::RustNotepadApp;
 
@@ -295,7 +295,7 @@ pub fn render(app: &mut RustNotepadApp, ui: &mut egui::Ui) {
 fn highlight_current_line(
     ui: &egui::Ui,
     output: &egui::text_edit::TextEditOutput,
-    theme: &rust_notepad::theme::AppTheme,
+    theme: &crate::theme::AppTheme,
 ) {
     let cursor_range = match &output.cursor_range {
         Some(r) => r,
@@ -324,7 +324,7 @@ fn highlight_matching_brace(
     ui: &egui::Ui,
     output: &egui::text_edit::TextEditOutput,
     content: &str,
-    theme: &rust_notepad::theme::AppTheme,
+    theme: &crate::theme::AppTheme,
 ) {
     let cursor_range = match &output.cursor_range {
         Some(r) => r,

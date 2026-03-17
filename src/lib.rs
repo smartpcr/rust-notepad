@@ -7,3 +7,5 @@ pub mod plugins;
 pub mod settings;
 pub mod shortcuts;
 pub mod theme;
+
+pub mod app;
