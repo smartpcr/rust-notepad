@@ -64,17 +64,39 @@ fn main() -> eframe::Result<()> {
     let cli = Cli::parse();
     let files = cli.files;
 
-    let native_options = eframe::NativeOptions {
-        viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("TextEdit")
-            .with_inner_size([1200.0, 800.0])
-            .with_drag_and_drop(true),
+    let viewport = eframe::egui::ViewportBuilder::default()
+        .with_title("TextEdit")
+        .with_inner_size([1200.0, 800.0])
+        .with_drag_and_drop(true);
+
+    // Try glow (OpenGL) first — it's faster on most machines.
+    // Fall back to wgpu if OpenGL 2.0+ is not available.
+    let glow_options = eframe::NativeOptions {
+        viewport: viewport.clone(),
         renderer: eframe::Renderer::Glow,
+        ..Default::default()
+    };
+    let files_clone = files.clone();
+    let result = eframe::run_native(
+        "TextEdit",
+        glow_options,
+        Box::new(move |cc| Ok(Box::new(RustNotepadApp::new_with_files(cc, files_clone)))),
+    );
+
+    if result.is_ok() {
+        return result;
+    }
+
+    log::warn!("Glow (OpenGL) failed, falling back to wgpu: {}", result.as_ref().unwrap_err());
+
+    let wgpu_options = eframe::NativeOptions {
+        viewport,
+        renderer: eframe::Renderer::Wgpu,
         ..Default::default()
     };
     let result = eframe::run_native(
         "TextEdit",
-        native_options,
+        wgpu_options,
         Box::new(move |cc| Ok(Box::new(RustNotepadApp::new_with_files(cc, files)))),
     );
 
