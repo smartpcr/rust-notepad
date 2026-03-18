@@ -559,9 +559,13 @@ impl RustNotepadApp {
 
 impl eframe::App for RustNotepadApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // 0. Apply theme + UI zoom every frame (eframe may reset after init)
+        // 0. Apply theme + UI zoom (only update pixels_per_point when changed
+        //    to avoid relayout that kills open popups/menus)
         self.app_theme.apply(ctx);
-        ctx.set_pixels_per_point(self.view.pixels_per_point());
+        let desired_ppp = self.view.pixels_per_point();
+        if (ctx.pixels_per_point() - desired_ppp).abs() > f32::EPSILON {
+            ctx.set_pixels_per_point(desired_ppp);
+        }
 
         // 0.5 Handle drag-and-drop files
         let dropped_files: Vec<PathBuf> = ctx.input(|i| {
