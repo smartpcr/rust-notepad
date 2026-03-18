@@ -87,7 +87,10 @@ fn main() -> eframe::Result<()> {
         return result;
     }
 
-    log::warn!("Glow (OpenGL) failed, falling back to wgpu: {}", result.as_ref().unwrap_err());
+    log::warn!(
+        "Glow (OpenGL) failed, falling back to wgpu: {}",
+        result.as_ref().unwrap_err()
+    );
 
     let wgpu_options = eframe::NativeOptions {
         viewport,
